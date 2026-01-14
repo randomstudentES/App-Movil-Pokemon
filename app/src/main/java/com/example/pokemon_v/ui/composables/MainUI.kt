@@ -1,19 +1,20 @@
 package com.example.pokemon_v.ui.composables
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -22,10 +23,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.pokemon_v.ui.composables.pantallas.BuscarScreen
-import com.example.pokemon_v.ui.composables.pantallas.CrearScreen
-import com.example.pokemon_v.ui.composables.pantallas.ParaTiScreen
-import com.example.pokemon_v.ui.composables.pantallas.PerfilScreen
+import com.example.pokemon_v.R
+import com.example.pokemon_v.ui.composables.pantallas.*
 
 @Preview(showBackground = true)
 @Composable
@@ -34,22 +33,27 @@ fun NavMenuScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Ocultar Scaffold en la pantalla de "crear" para que sea a pantalla completa
-    val showScaffold = currentRoute != "crear"
+    // Ocultar Scaffold en la pantalla de "crear" e "info_equipo" para que sean a pantalla completa
+    val showScaffold = currentRoute != "crear" && currentRoute != "info_equipo"
+    
+    // Solo mostrar TopBar si estamos en info_equipo (donde pusimos el botón volver) 
+    // o si decides habilitarlo para otras pantallas. Por defecto ahora no se muestra la Cabecera.
+    val showTopBar = currentRoute == "info_equipo"
 
     Scaffold(
         topBar = {
-            if (showScaffold) {
-                Cabecera()
+            if (showTopBar) {
+                // Aquí podrías poner la Cabecera() si quisieras, 
+                // pero InfoEquipo ya tiene su propia TopAppBar en su archivo.
             }
         },
         bottomBar = {
             if (showScaffold) {
                 MenuInferior(navController, currentRoute)
             }
-        }
+        },
+        containerColor = Color.Transparent // Fondo del scaffold transparente
     ) { paddingValues ->
-        // Aplicar el padding del Scaffold solo si se muestra la barra inferior
         val modifier = Modifier.padding(if (showScaffold) paddingValues else PaddingValues(0.dp))
 
         NavHost(
@@ -57,12 +61,31 @@ fun NavMenuScreen() {
             startDestination = "perfil",
             modifier = modifier
         ) {
-            composable("perfil") { PerfilScreen() }
-            composable("buscar") { BuscarScreen() }
-            composable("para_ti") { ParaTiScreen() }
+            composable("perfil") { 
+                PerfilScreen(
+                    onCrearClick = { navController.navigate("crear") },
+                    onInfoClick = { navController.navigate("info_equipo") }
+                ) 
+            }
+            composable("buscar") { 
+                BuscarScreen(
+                    onInfoClick = { navController.navigate("info_equipo") },
+                    onProfileClick = { navController.navigate("perfil") }
+                ) 
+            }
+            composable("para_ti") { 
+                ParaTiScreen(
+                    onInfoClick = { navController.navigate("info_equipo") },
+                    onProfileClick = { navController.navigate("perfil") }
+                ) 
+            }
             composable("crear") {
                 CrearScreen(onBack = {
-                    // Al volver, se destruye la pantalla de crear del stack
+                    navController.popBackStack()
+                })
+            }
+            composable("info_equipo") {
+                InfoEquipoScreen(onBack = {
                     navController.popBackStack()
                 })
             }
@@ -76,7 +99,7 @@ fun Cabecera() {
     CenterAlignedTopAppBar(
         title = { Text("Pokemon App") },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = Color.Transparent
         )
     )
 }
@@ -85,10 +108,10 @@ fun Cabecera() {
 fun MenuInferior(navController: NavHostController, currentRoute: String?) {
     NavigationBar(
         modifier = Modifier
-            .padding(start = 12.dp, end = 12.dp, bottom = 16.dp) // Flota a una distancia prudente
+            .padding(start = 12.dp, end = 12.dp, bottom = 16.dp)
             .clip(RoundedCornerShape(28.dp)),
         containerColor = Color(0xFF1C1C1C),
-        tonalElevation = 8.dp
+        tonalElevation = 0.dp // Eliminar elevación para evitar sombras grises
     ) {
         val items = listOf(
             Triple("perfil", "Perfil", Icons.Default.Person),
@@ -121,7 +144,6 @@ fun MenuInferior(navController: NavHostController, currentRoute: String?) {
                         navController.navigate("crear")
                     } else {
                         navController.navigate(route) {
-                            // Navega al destino inicial para evitar acumular pantallas
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
                             }
@@ -134,6 +156,94 @@ fun MenuInferior(navController: NavHostController, currentRoute: String?) {
                     indicatorColor = if (isCrear) Color(0xFF2196F3).copy(alpha = 0.1f) else Color(0xFF333333)
                 )
             )
+        }
+    }
+}
+
+@Composable
+fun TeamList(onInfoClick: () -> Unit, onProfileClick: () -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp)
+    ) {
+        items(4) {
+            TeamCard(onInfoClick = onInfoClick, onProfileClick = onProfileClick)
+        }
+    }
+}
+
+@Composable
+fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit) {
+    var isFavorite by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .clip(RoundedCornerShape(24.dp))
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.placeholder),
+                contentDescription = "Imagen del equipo",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            IconButton(
+                onClick = { isFavorite = !isFavorite },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Like",
+                    tint = if (isFavorite) Color.Red else Color.Black,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccountCircle,
+                contentDescription = "Perfil usuario",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clickable { onProfileClick() },
+                tint = Color.Gray
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = "aaaaaaaa",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.clickable { onProfileClick() }
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            OutlinedButton(
+                onClick = onInfoClick,
+                shape = RoundedCornerShape(12.dp),
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 2.dp)
+            ) {
+                Text(
+                    text = "info",
+                    color = Color.Black
+                )
+            }
         }
     }
 }

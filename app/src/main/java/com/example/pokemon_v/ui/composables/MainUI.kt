@@ -19,10 +19,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.pokemon_v.R
 import com.example.pokemon_v.ui.composables.pantallas.*
 
@@ -33,18 +35,16 @@ fun NavMenuScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Ocultar Scaffold en la pantalla de "crear" e "info_equipo" para que sean a pantalla completa
-    val showScaffold = currentRoute != "crear" && currentRoute != "info_equipo"
+    // Ocultar Scaffold en pantallas de flujo específico para que sean a pantalla completa
+    val fullScreens = listOf("crear", "info_equipo", "lista_pokemon/{index}")
+    val showScaffold = currentRoute != null && !fullScreens.any { currentRoute!!.startsWith(it.split("/")[0]) }
     
-    // Solo mostrar TopBar si estamos en info_equipo (donde pusimos el botón volver) 
-    // o si decides habilitarlo para otras pantallas. Por defecto ahora no se muestra la Cabecera.
     val showTopBar = currentRoute == "info_equipo"
 
     Scaffold(
         topBar = {
             if (showTopBar) {
-                // Aquí podrías poner la Cabecera() si quisieras, 
-                // pero InfoEquipo ya tiene su propia TopAppBar en su archivo.
+                // InfoEquipo maneja su propia TopBar
             }
         },
         bottomBar = {
@@ -52,7 +52,7 @@ fun NavMenuScreen() {
                 MenuInferior(navController, currentRoute)
             }
         },
-        containerColor = Color.Transparent // Fondo del scaffold transparente
+        containerColor = Color.Transparent
     ) { paddingValues ->
         val modifier = Modifier.padding(if (showScaffold) paddingValues else PaddingValues(0.dp))
 
@@ -80,14 +80,28 @@ fun NavMenuScreen() {
                 ) 
             }
             composable("crear") {
-                CrearScreen(onBack = {
-                    navController.popBackStack()
-                })
+                CrearScreen(
+                    navController = navController,
+                    onBack = { navController.popBackStack() },
+                    onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
+                )
             }
             composable("info_equipo") {
-                InfoEquipoScreen(onBack = {
-                    navController.popBackStack()
-                })
+                InfoEquipoScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = "lista_pokemon/{index}",
+                arguments = listOf(navArgument("index") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val index = backStackEntry.arguments?.getInt("index") ?: 0
+                ListaPokemonScreen(
+                    onBack = { navController.popBackStack() },
+                    onPokemonSelected = { pokemonName ->
+                        navController.previousBackStackEntry?.savedStateHandle?.set("selected_pokemon", pokemonName)
+                        navController.previousBackStackEntry?.savedStateHandle?.set("target_index", index)
+                        navController.popBackStack()
+                    }
+                )
             }
         }
     }
@@ -111,7 +125,7 @@ fun MenuInferior(navController: NavHostController, currentRoute: String?) {
             .padding(start = 12.dp, end = 12.dp, bottom = 16.dp)
             .clip(RoundedCornerShape(28.dp)),
         containerColor = Color(0xFF1C1C1C),
-        tonalElevation = 0.dp // Eliminar elevación para evitar sombras grises
+        tonalElevation = 0.dp
     ) {
         val items = listOf(
             Triple("perfil", "Perfil", Icons.Default.Person),
@@ -226,11 +240,19 @@ fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit) {
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            Text(
-                text = "aaaaaaaa",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.clickable { onProfileClick() }
-            )
+            Column {
+                Text(
+                    text = "Nombre del Equipo",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.clickable { onProfileClick() }
+                )
+                Text(
+                    text = "aaaaaaaa",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.clickable { onProfileClick() },
+                    color = Color.Gray
+                )
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 

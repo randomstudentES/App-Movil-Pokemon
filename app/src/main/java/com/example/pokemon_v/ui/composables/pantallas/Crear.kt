@@ -1,30 +1,111 @@
 package com.example.pokemon_v.ui.composables.pantallas
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CrearScreen(onBack: () -> Unit) {
+fun CrearScreen(
+    navController: NavHostController,
+    onBack: () -> Unit, 
+    onAddPokemonClick: (Int) -> Unit
+) {
+    // Usamos rememberSaveable para que los datos sobrevivan a la navegación (cuando el composable se destruye al ir a la lista)
+    var teamName by rememberSaveable { mutableStateOf("") }
+    var selectedPokemons by rememberSaveable { 
+        mutableStateOf(listOf<String?>(null, null, null, null, null, null)) 
+    }
+    
+    // Estado para controlar la visibilidad del diálogo de confirmación
+    var showExitConfirmation by remember { mutableStateOf(false) }
+
+    // Función para manejar el intento de salida
+    val handleExitAttempt = {
+        if (teamName.isNotBlank() || selectedPokemons.any { it != null }) {
+            showExitConfirmation = true
+        } else {
+            onBack()
+        }
+    }
+
+    // Manejar el botón de atrás del sistema
+    BackHandler(enabled = true) {
+        handleExitAttempt()
+    }
+
+    // Diálogo de confirmación
+    if (showExitConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmation = false },
+            title = { Text("¿Salir sin guardar?") },
+            text = { Text("Si sales ahora, se perderán todos los datos del equipo que has introducido.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExitConfirmation = false
+                        onBack()
+                    }
+                ) {
+                    Text("Salir", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirmation = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Obtenemos el SavedStateHandle de la entrada actual
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+
+    // Observamos los flujos de datos. Usamos collectAsState() de forma segura.
+    val resultState = savedStateHandle?.getStateFlow<String?>("selected_pokemon", null)?.collectAsState()
+    val targetIndexState = savedStateHandle?.getStateFlow<Int?>("target_index", null)?.collectAsState()
+
+    // Procesamos el resultado cuando cambia
+    LaunchedEffect(resultState?.value, targetIndexState?.value) {
+        val name = resultState?.value
+        val index = targetIndexState?.value
+        
+        if (name != null && index != null) {
+            val newList = selectedPokemons.toMutableList()
+            if (index in 0 until 6) {
+                newList[index] = name
+                selectedPokemons = newList
+            }
+            // Limpiamos el handle para evitar que se vuelva a procesar el mismo dato
+            savedStateHandle.remove<String>("selected_pokemon")
+            savedStateHandle.remove<Int>("target_index")
+        }
+    }
+
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Crear Equipo") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                    IconButton(onClick = handleExitAttempt) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { paddingValues ->
@@ -32,14 +113,47 @@ fun CrearScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Pantalla de Crear",
-                fontSize = 24.sp
+            OutlinedTextField(
+                value = teamName,
+                onValueChange = { teamName = it },
+                label = { Text("Nombre del equipo") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
+
+            selectedPokemons.forEachIndexed { index, pokemon ->
+                Button(
+                    onClick = { onAddPokemonClick(index) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (pokemon != null) Color(0xFFE3F2FD) else MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = if (pokemon != null) Color(0xFF1976D2) else MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (pokemon != null) Icons.Default.Check else Icons.Default.Add, 
+                        contentDescription = null
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(text = pokemon ?: "Añadir Pokémon")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = { /* Lógica para guardar el equipo */ },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = teamName.isNotBlank() && selectedPokemons.any { it != null }
+            ) {
+                Text("Guardar Equipo")
+            }
         }
     }
 }

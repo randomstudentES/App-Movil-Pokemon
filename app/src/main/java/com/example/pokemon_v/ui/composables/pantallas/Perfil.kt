@@ -14,6 +14,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pokemon_v.ui.composables.TeamCard
+import com.example.pokemon_v.ui.composables.TeamList
+import com.example.pokemon_v.ui.composables.api.getInfoUser
+import com.example.pokemon_v.ui.composables.api.getTeams
+import com.example.pokemon_v.ui.composables.api.getTeamsById
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -21,11 +25,27 @@ fun PerfilScreen(onCrearClick: () -> Unit, onInfoClick: () -> Unit) {
     var showMenu by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
 
+    var usuarioNombre by remember { mutableStateOf<String?>(null) }
+    var usuarioDescripcion by remember { mutableStateOf<String?>(null) }
+
+    val teamsState = produceState<List<Pair<String, String>>>(initialValue = emptyList()) {
+        value = getTeamsById()
+    }
+
+    val teams = teamsState.value
+
+    // Use LaunchedEffect to call the suspend function
+    LaunchedEffect(Unit) {
+        val (nombre, descripcion) = getInfoUser() // Call your suspend function here
+        usuarioNombre = nombre
+        usuarioDescripcion = descripcion
+    }
+
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Nombre Usuario", fontWeight = FontWeight.Bold) },
+                title = { Text(usuarioNombre.toString(), fontSize = 20.sp, fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = { showMenu = true }) {
                         Icon(
@@ -67,7 +87,7 @@ fun PerfilScreen(onCrearClick: () -> Unit, onInfoClick: () -> Unit) {
         ) {
             // Descripción
             Text(
-                text = "Descripcion: blablabla blablablablablabla",
+                text = usuarioDescripcion.toString(),
                 fontSize = 18.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -102,10 +122,11 @@ fun PerfilScreen(onCrearClick: () -> Unit, onInfoClick: () -> Unit) {
                 modifier = Modifier.align(Alignment.Start),
                 fontWeight = FontWeight.Bold
             )
-            
-            TeamCard(
+
+            TeamList(
+                teams = teams, // Pasamos la lista de equipos
                 onInfoClick = onInfoClick,
-                onProfileClick = { /* Ya estamos en perfil */ }
+                onProfileClick = onInfoClick
             )
         }
     }

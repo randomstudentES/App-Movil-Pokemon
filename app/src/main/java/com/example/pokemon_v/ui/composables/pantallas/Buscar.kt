@@ -38,6 +38,6 @@ fun BuscarScreen(
             )
         )
 
-        TeamList(onInfoClick = onInfoClick, onProfileClick = onProfileClick)
+//        TeamList(onInfoClick = onInfoClick, onProfileClick = onProfileClick, teams = null)
     }
 }

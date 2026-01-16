@@ -26,6 +26,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.pokemon_v.R
+import com.example.pokemon_v.ui.composables.api.getTeams
 import com.example.pokemon_v.ui.composables.pantallas.*
 
 @Preview(showBackground = true)
@@ -175,19 +176,32 @@ fun MenuInferior(navController: NavHostController, currentRoute: String?) {
 }
 
 @Composable
-fun TeamList(onInfoClick: () -> Unit, onProfileClick: () -> Unit) {
+fun TeamList(
+    teams: List<Pair<String, String>>, // Aceptamos la lista por parámetro
+    onInfoClick: () -> Unit,
+    onProfileClick: () -> Unit
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        items(4) {
-            TeamCard(onInfoClick = onInfoClick, onProfileClick = onProfileClick)
+        items(teams.size) { index ->
+            // Desestructuramos el Pair (nombre, creador)
+            val (equipoNombre, creadorNombre) = teams[index]
+
+            TeamCard(
+                onInfoClick = onInfoClick,
+                onProfileClick = onProfileClick,
+                nombreEquipo = equipoNombre,
+                nombreCreador = creadorNombre
+            )
         }
     }
 }
 
+
 @Composable
-fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit) {
+fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: String, nombreCreador: String) {
     var isFavorite by remember { mutableStateOf(false) }
 
     Column(
@@ -242,12 +256,12 @@ fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit) {
 
             Column {
                 Text(
-                    text = "Nombre del Equipo",
+                    text = nombreEquipo,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.clickable { onProfileClick() }
                 )
                 Text(
-                    text = "aaaaaaaa",
+                    text = nombreCreador,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.clickable { onProfileClick() },
                     color = Color.Gray

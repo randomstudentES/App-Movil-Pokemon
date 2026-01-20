@@ -197,7 +197,8 @@ fun TeamList(
                 onInfoClick = { onInfoClick(team.id) },
                 onProfileClick = onProfileClick,
                 nombreEquipo = team.nombre,
-                nombreCreador = team.creador
+                nombreCreador = team.creador,
+                showButtonInfo = true
             )
         }
     }
@@ -205,7 +206,7 @@ fun TeamList(
 
 
 @Composable
-fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: String, nombreCreador: String) {
+fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: String, nombreCreador: String, showButtonInfo: Boolean) {
     var isFavorite by remember { mutableStateOf(false) }
 
     Column(
@@ -274,16 +275,19 @@ fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: 
 
             Spacer(modifier = Modifier.weight(1f))
 
-            OutlinedButton(
-                onClick = onInfoClick,
-                shape = RoundedCornerShape(12.dp),
-                border = ButtonDefaults.outlinedButtonBorder.copy(width = 2.dp)
-            ) {
-                Text(
-                    text = "info",
-                    color = Color.Black
-                )
+            if (showButtonInfo) {
+                OutlinedButton(
+                    onClick = onInfoClick,
+                    shape = RoundedCornerShape(12.dp),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(width = 2.dp)
+                ) {
+                    Text(
+                        text = "info",
+                        color = Color.Black
+                    )
+                }
             }
+
         }
     }
 }

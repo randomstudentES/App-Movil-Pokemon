@@ -1,13 +1,63 @@
 package com.example.pokemon_v.ui.composables.api
 
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 
-data class Team(val id: Int, val nombre: String, val creador: String)
+data class Team(
+    val id: Int, 
+    val nombre: String, 
+    val creador: String, 
+    val pokemonIds: List<Int?> = emptyList()
+)
+
+data class PokemonInfo(
+    val id: Int,
+    val name: String,
+    val baseExperience: Int,
+    val abilitiesCount: Int,
+    val movesCount: Int,
+    val imageUrl: String
+)
+
+private val client = OkHttpClient()
+private val gson = Gson()
+
+suspend fun getPokemonInfo(pokemonId: Int): PokemonInfo? = withContext(Dispatchers.IO) {
+    try {
+        val request = Request.Builder()
+            .url("https://pokeapi.co/api/v2/pokemon/$pokemonId")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext null
+
+            val body = response.body?.string() ?: return@withContext null
+            val jsonObject = gson.fromJson(body, JsonObject::class.java)
+
+            val id = jsonObject.get("id").asInt
+            val name = jsonObject.get("name").asString
+            val baseExperience = jsonObject.get("base_experience").asInt
+            val abilitiesCount = jsonObject.getAsJsonArray("abilities").size()
+            val movesCount = jsonObject.getAsJsonArray("moves").size()
+            
+            // Imagen por defecto de la API
+            val imageUrl = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png"
+
+            PokemonInfo(id, name, baseExperience, abilitiesCount, movesCount, imageUrl)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
 
 suspend fun getTeams(): List<Team> = withContext(Dispatchers.IO) {
     val url = "jdbc:mysql://10.0.2.2:3308/pokemon"
@@ -21,32 +71,23 @@ suspend fun getTeams(): List<Team> = withContext(Dispatchers.IO) {
 
     try {
         Class.forName("com.mysql.jdbc.Driver")
-
         connection = DriverManager.getConnection(url, user, password)
 
-        val sql = "SELECT e.ID, e.nombre AS equipo_nombre, u.usuario AS creador_nombre FROM equipos e JOIN usuarios u ON e.ID_creator = u.ID;"
+        val sql = "SELECT e.*, u.usuario AS creador_nombre FROM equipos e JOIN usuarios u ON e.ID_creator = u.ID;"
         preparedStatement = connection.prepareStatement(sql)
         resultSet = preparedStatement.executeQuery()
 
         while (resultSet.next()) {
-            val id = resultSet.getInt("ID")
-            val equipoNombre = resultSet.getString("equipo_nombre")
-            val creadorNombre = resultSet.getString("creador_nombre")
-            allTeams.add(Team(id, equipoNombre, creadorNombre))
+            allTeams.add(mapResultSetToTeam(resultSet))
         }
 
     } catch (e: Exception) {
         e.printStackTrace()
     } finally {
-        try {
-            resultSet?.close()
-            preparedStatement?.close()
-            connection?.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        resultSet?.close()
+        preparedStatement?.close()
+        connection?.close()
     }
-
     allTeams
 }
 
@@ -64,30 +105,37 @@ suspend fun getTeamById(id: Int): Team? = withContext(Dispatchers.IO) {
         Class.forName("com.mysql.jdbc.Driver")
         connection = DriverManager.getConnection(url, user, password)
 
-        val sql = "SELECT e.ID, e.nombre AS equipo_nombre, u.usuario AS creador_nombre FROM equipos e JOIN usuarios u ON e.ID_creator = u.ID WHERE e.ID = ?"
+        val sql = "SELECT e.*, u.usuario AS creador_nombre FROM equipos e JOIN usuarios u ON e.ID_creator = u.ID WHERE e.ID = ?"
         preparedStatement = connection.prepareStatement(sql)
         preparedStatement.setInt(1, id)
         resultSet = preparedStatement.executeQuery()
 
         if (resultSet.next()) {
-            val teamId = resultSet.getInt("ID")
-            val equipoNombre = resultSet.getString("equipo_nombre")
-            val creadorNombre = resultSet.getString("creador_nombre")
-            team = Team(teamId, equipoNombre, creadorNombre)
+            team = mapResultSetToTeam(resultSet)
         }
 
     } catch (e: Exception) {
         e.printStackTrace()
     } finally {
-        try {
-            resultSet?.close()
-            preparedStatement?.close()
-            connection?.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        resultSet?.close()
+        preparedStatement?.close()
+        connection?.close()
     }
     team
+}
+
+private fun mapResultSetToTeam(rs: ResultSet): Team {
+    val ids = mutableListOf<Int?>()
+    for (i in 1..6) {
+        val pId = rs.getInt("id_pokemon$i")
+        ids.add(if (rs.wasNull()) null else pId)
+    }
+    return Team(
+        id = rs.getInt("ID"),
+        nombre = rs.getString("nombre"),
+        creador = rs.getString("creador_nombre"),
+        pokemonIds = ids
+    )
 }
 
 suspend fun getInfoUser(): Pair<String?, String?> = withContext(Dispatchers.IO) {
@@ -104,30 +152,21 @@ suspend fun getInfoUser(): Pair<String?, String?> = withContext(Dispatchers.IO) 
     try {
         Class.forName("com.mysql.jdbc.Driver")
         connection = DriverManager.getConnection(url, user, password)
-
-        val sql = "SELECT usuario, descripcion FROM usuarios WHERE ID = ?"
+        val sql = "SELECT usuario, descripcion FROM usuarios WHERE ID = 1"
         preparedStatement = connection.prepareStatement(sql)
-        preparedStatement.setInt(1, 1)
-
         resultSet = preparedStatement.executeQuery()
 
         if (resultSet.next()) {
             usuarioNombre = resultSet.getString("usuario")
             usuarioDescripcion = resultSet.getString("descripcion")
         }
-
     } catch (e: Exception) {
         e.printStackTrace()
     } finally {
-        try {
-            resultSet?.close()
-            preparedStatement?.close()
-            connection?.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        resultSet?.close()
+        preparedStatement?.close()
+        connection?.close()
     }
-
     Pair(usuarioNombre, usuarioDescripcion)
 }
 
@@ -143,32 +182,22 @@ suspend fun getTeamsById(): List<Team> = withContext(Dispatchers.IO) {
 
     try {
         Class.forName("com.mysql.jdbc.Driver")
-
         connection = DriverManager.getConnection(url, user, password)
 
-        val sql = "SELECT e.ID, e.nombre AS equipo_nombre, u.usuario AS creador_nombre FROM equipos e JOIN usuarios u ON e.ID_creator = u.ID WHERE u.ID = 1"
+        val sql = "SELECT e.*, u.usuario AS creador_nombre FROM equipos e JOIN usuarios u ON e.ID_creator = u.ID WHERE u.ID = 1"
         preparedStatement = connection.prepareStatement(sql)
         resultSet = preparedStatement.executeQuery()
 
         while (resultSet.next()) {
-            val id = resultSet.getInt("ID")
-            val equipoNombre = resultSet.getString("equipo_nombre")
-            val creadorNombre = resultSet.getString("creador_nombre")
-            allTeams.add(Team(id, equipoNombre, creadorNombre))
+            allTeams.add(mapResultSetToTeam(resultSet))
         }
-
     } catch (e: Exception) {
         e.printStackTrace()
     } finally {
-        try {
-            resultSet?.close()
-            preparedStatement?.close()
-            connection?.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        resultSet?.close()
+        preparedStatement?.close()
+        connection?.close()
     }
-
     allTeams
 }
 
@@ -208,7 +237,6 @@ suspend fun saveTeam(nombre: String, creatorId: Int, pokemonIds: List<String?>):
             }
             rs.close()
         }
-
     } catch (e: Exception) {
         e.printStackTrace()
     } finally {

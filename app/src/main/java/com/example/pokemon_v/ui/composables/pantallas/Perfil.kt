@@ -13,22 +13,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.pokemon_v.ui.composables.TeamCard
 import com.example.pokemon_v.ui.composables.TeamList
+import com.example.pokemon_v.ui.composables.api.Team
 import com.example.pokemon_v.ui.composables.api.getInfoUser
-import com.example.pokemon_v.ui.composables.api.getTeams
 import com.example.pokemon_v.ui.composables.api.getTeamsById
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PerfilScreen(onCrearClick: () -> Unit, onInfoClick: () -> Unit) {
+fun PerfilScreen(onCrearClick: () -> Unit, onInfoClick: (Int) -> Unit) {
     var showMenu by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
 
     var usuarioNombre by remember { mutableStateOf<String?>(null) }
     var usuarioDescripcion by remember { mutableStateOf<String?>(null) }
 
-    val teamsState = produceState<List<Pair<String, String>>>(initialValue = emptyList()) {
+    val teamsState = produceState<List<Team>>(initialValue = emptyList()) {
         value = getTeamsById()
     }
 
@@ -126,7 +125,7 @@ fun PerfilScreen(onCrearClick: () -> Unit, onInfoClick: () -> Unit) {
             TeamList(
                 teams = teams, // Pasamos la lista de equipos
                 onInfoClick = onInfoClick,
-                onProfileClick = onInfoClick
+                onProfileClick = { /* Manejar clic en perfil si es necesario */ }
             )
         }
     }

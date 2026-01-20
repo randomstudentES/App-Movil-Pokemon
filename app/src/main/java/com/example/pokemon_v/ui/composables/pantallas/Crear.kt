@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.example.pokemon_v.ui.composables.api.saveTeam
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,7 +26,9 @@ fun CrearScreen(
     onBack: () -> Unit, 
     onAddPokemonClick: (Int) -> Unit
 ) {
-    // Usamos rememberSaveable para que los datos sobrevivan a la navegación (cuando el composable se destruye al ir a la lista)
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Usamos rememberSaveable para que los datos sobrevivan a la navegación
     var teamName by rememberSaveable { mutableStateOf("") }
     var selectedPokemons by rememberSaveable { 
         mutableStateOf(listOf<String?>(null, null, null, null, null, null)) 
@@ -74,7 +78,7 @@ fun CrearScreen(
     // Obtenemos el SavedStateHandle de la entrada actual
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
 
-    // Observamos los flujos de datos. Usamos collectAsState() de forma segura.
+    // Observamos los flujos de datos
     val resultState = savedStateHandle?.getStateFlow<String?>("selected_pokemon", null)?.collectAsState()
     val targetIndexState = savedStateHandle?.getStateFlow<Int?>("target_index", null)?.collectAsState()
 
@@ -89,7 +93,7 @@ fun CrearScreen(
                 newList[index] = name
                 selectedPokemons = newList
             }
-            // Limpiamos el handle para evitar que se vuelva a procesar el mismo dato
+            // Limpiamos el handle
             savedStateHandle.remove<String>("selected_pokemon")
             savedStateHandle.remove<Int>("target_index")
         }
@@ -141,14 +145,29 @@ fun CrearScreen(
                         contentDescription = null
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(text = pokemon ?: "Añadir Pokémon")
+                    Text(text = if (pokemon != null) "Pokémon $pokemon" else "Añadir Pokémon")
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { /* Lógica para guardar el equipo */ },
+                onClick = {
+                    coroutineScope.launch {
+                        val newTeamId = saveTeam(
+                            nombre = teamName,
+                            creatorId = 1,
+                            pokemonIds = selectedPokemons
+                        )
+                        if (newTeamId != null) {
+                            // Navegar a la pantalla de info del nuevo equipo
+                            navController.navigate("info_equipo/$newTeamId") {
+                                // Limpiar el historial para que al volver no regrese a "Crear"
+                                popUpTo("perfil") { inclusive = false }
+                            }
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = teamName.isNotBlank() && selectedPokemons.any { it != null }
             ) {

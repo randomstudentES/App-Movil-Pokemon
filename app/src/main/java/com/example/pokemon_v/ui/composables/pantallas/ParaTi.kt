@@ -6,14 +6,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import com.example.pokemon_v.ui.composables.TeamList
+import com.example.pokemon_v.ui.composables.api.Team
 import com.example.pokemon_v.ui.composables.api.getTeams
 
 @Composable
 fun ParaTiScreen(
-    onInfoClick: () -> Unit,
+    onInfoClick: (Int) -> Unit,
     onProfileClick: () -> Unit
 ) {
-    val teamsState = produceState<List<Pair<String, String>>>(initialValue = emptyList()) {
+    // Cambiado de List<Pair<String, String>> a List<Team>
+    val teamsState = produceState<List<Team>>(initialValue = emptyList()) {
         value = getTeams()
     }
 
@@ -23,7 +25,7 @@ fun ParaTiScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         TeamList(
-            teams = teams, // Pasamos la lista de equipos
+            teams = teams, 
             onInfoClick = onInfoClick,
             onProfileClick = onProfileClick
         )

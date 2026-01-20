@@ -39,13 +39,14 @@ fun ListaPokemonScreen(onBack: () -> Unit, onPokemonSelected: (String) -> Unit) 
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            items(1200) { index ->
-                val pokemonName = "pokemon_${index + 1}"
+            items(1025) { index ->
+                val pokemonId = (index + 1).toString()
+                val pokemonName = "pokemon_$pokemonId"
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(40.dp)
-                        .clickable { onPokemonSelected(pokemonName) },
+                        .clickable { onPokemonSelected(pokemonId) },
                     shape = RoundedCornerShape(8.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = Color.Black.copy(alpha = 0.05f)

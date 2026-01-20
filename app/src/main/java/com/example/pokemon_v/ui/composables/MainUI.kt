@@ -26,6 +26,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.pokemon_v.R
+import com.example.pokemon_v.ui.composables.api.Team
 import com.example.pokemon_v.ui.composables.api.getTeams
 import com.example.pokemon_v.ui.composables.pantallas.*
 
@@ -40,7 +41,7 @@ fun NavMenuScreen() {
     val fullScreens = listOf("crear", "info_equipo", "lista_pokemon/{index}")
     val showScaffold = currentRoute != null && !fullScreens.any { currentRoute!!.startsWith(it.split("/")[0]) }
     
-    val showTopBar = currentRoute == "info_equipo"
+    val showTopBar = currentRoute?.startsWith("info_equipo") == true
 
     Scaffold(
         topBar = {
@@ -65,18 +66,18 @@ fun NavMenuScreen() {
             composable("perfil") { 
                 PerfilScreen(
                     onCrearClick = { navController.navigate("crear") },
-                    onInfoClick = { navController.navigate("info_equipo") }
+                    onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") }
                 ) 
             }
             composable("buscar") { 
                 BuscarScreen(
-                    onInfoClick = { navController.navigate("info_equipo") },
+                    onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
                     onProfileClick = { navController.navigate("perfil") }
                 ) 
             }
             composable("para_ti") { 
                 ParaTiScreen(
-                    onInfoClick = { navController.navigate("info_equipo") },
+                    onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
                     onProfileClick = { navController.navigate("perfil") }
                 ) 
             }
@@ -87,8 +88,12 @@ fun NavMenuScreen() {
                     onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
                 )
             }
-            composable("info_equipo") {
-                InfoEquipoScreen(onBack = { navController.popBackStack() })
+            composable(
+                route = "info_equipo/{teamId}",
+                arguments = listOf(navArgument("teamId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val teamId = backStackEntry.arguments?.getInt("teamId") ?: 0
+                InfoEquipoScreen(teamId = teamId, onBack = { navController.popBackStack() })
             }
             composable(
                 route = "lista_pokemon/{index}",
@@ -177,8 +182,8 @@ fun MenuInferior(navController: NavHostController, currentRoute: String?) {
 
 @Composable
 fun TeamList(
-    teams: List<Pair<String, String>>, // Aceptamos la lista por parámetro
-    onInfoClick: () -> Unit,
+    teams: List<Team>, 
+    onInfoClick: (Int) -> Unit,
     onProfileClick: () -> Unit
 ) {
     LazyColumn(
@@ -186,14 +191,13 @@ fun TeamList(
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         items(teams.size) { index ->
-            // Desestructuramos el Pair (nombre, creador)
-            val (equipoNombre, creadorNombre) = teams[index]
+            val team = teams[index]
 
             TeamCard(
-                onInfoClick = onInfoClick,
+                onInfoClick = { onInfoClick(team.id) },
                 onProfileClick = onProfileClick,
-                nombreEquipo = equipoNombre,
-                nombreCreador = creadorNombre
+                nombreEquipo = team.nombre,
+                nombreCreador = team.creador
             )
         }
     }

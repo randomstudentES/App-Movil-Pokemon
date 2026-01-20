@@ -8,20 +8,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.pokemon_v.ui.composables.TeamCard
+import com.example.pokemon_v.ui.composables.api.Team
+import com.example.pokemon_v.ui.composables.api.getTeamById
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InfoEquipoScreen(onBack: () -> Unit) {
+fun InfoEquipoScreen(teamId: Int, onBack: () -> Unit) {
+    val teamState = produceState<Team?>(initialValue = null) {
+        value = getTeamById(teamId)
+    }
+    val team = teamState.value
+
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Info Equipo") },
+                title = { Text(team?.nombre ?: "Cargando...") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -39,12 +47,18 @@ fun InfoEquipoScreen(onBack: () -> Unit) {
                 .padding(paddingValues)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
-            Text(
-                text = "pantalla info equipo",
-                fontSize = 16.sp
-            )
+            if (team != null) {
+                TeamCard(
+                    onInfoClick = {},
+                    onProfileClick = {},
+                    nombreEquipo = team.nombre,
+                    nombreCreador = team.creador
+                )
+            } else {
+                CircularProgressIndicator()
+            }
         }
     }
 }

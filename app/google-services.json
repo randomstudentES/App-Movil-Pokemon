@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1014403583657",
+    "project_id": "pk-viewer-test",
+    "storage_bucket": "pk-viewer-test.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1014403583657:android:46e8c7faebf276af25e3b8",
+        "android_client_info": {
+          "package_name": "com.example.pokemon_v"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjuqGZusDP19ULM18mYnS57G4AwgW6d2s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

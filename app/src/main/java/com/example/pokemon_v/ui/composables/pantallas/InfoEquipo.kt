@@ -85,7 +85,7 @@ fun InfoEquipoScreen(teamId: Int, onBack: () -> Unit) {
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(pokemonDetails) { pokemon ->
                         Card(

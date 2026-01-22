@@ -1,3 +1,4 @@
+
 package com.example.pokemon_v.ui.composables
 
 import androidx.compose.foundation.Image
@@ -17,6 +18,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -26,9 +28,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.pokemon_v.R
-import com.example.pokemon_v.ui.composables.api.Team
-import com.example.pokemon_v.ui.composables.api.getTeams
+import com.example.pokemon_v.models.Equipo
+import com.example.pokemon_v.services.FirestoreService
 import com.example.pokemon_v.ui.composables.pantallas.*
+import com.example.pokemon_v.viewmodels.MainViewModel
+import com.example.pokemon_v.viewmodels.MainViewModelFactory
 
 @Preview(showBackground = true)
 @Composable
@@ -37,21 +41,18 @@ fun NavMenuScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Ocultar Scaffold en pantallas de flujo específico para que sean a pantalla completa
+    // Instantiate ViewModel
+    val firestoreService = remember { FirestoreService() }
+    val viewModel: MainViewModel = viewModel(factory = MainViewModelFactory(firestoreService))
+    val currentUser by viewModel.currentUser.collectAsState()
+
     val fullScreens = listOf("crear", "info_equipo", "lista_pokemon/{index}")
     val showScaffold = currentRoute != null && !fullScreens.any { currentRoute!!.startsWith(it.split("/")[0]) }
-    
-    val showTopBar = currentRoute?.startsWith("info_equipo") == true
 
     Scaffold(
-        topBar = {
-            if (showTopBar) {
-                // InfoEquipo maneja su propia TopBar
-            }
-        },
         bottomBar = {
             if (showScaffold) {
-                MenuInferior(navController, currentRoute)
+                MenuInferior(navController, currentRoute, viewModel)
             }
         },
         containerColor = Color.Transparent
@@ -65,35 +66,48 @@ fun NavMenuScreen() {
         ) {
             composable("perfil") { 
                 PerfilScreen(
+                    viewModel = viewModel,
                     onCrearClick = { navController.navigate("crear") },
                     onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") }
                 ) 
             }
             composable("buscar") { 
-                BuscarScreen(
+                 BuscarScreen(
+                    viewModel = viewModel,
                     onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
                     onProfileClick = { navController.navigate("perfil") }
                 ) 
             }
             composable("para_ti") { 
-                ParaTiScreen(
+                 ParaTiScreen(
+                    viewModel = viewModel,
                     onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
                     onProfileClick = { navController.navigate("perfil") }
                 ) 
             }
             composable("crear") {
-                CrearScreen(
-                    navController = navController,
-                    onBack = { navController.popBackStack() },
-                    onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
-                )
+                if (currentUser != null) {
+                    CrearScreen(
+                        navController = navController,
+                        viewModel = viewModel,
+                        userId = currentUser!!.uid,
+                        onBack = { navController.popBackStack() },
+                        onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
+                    )
+                } else {
+                    // This should not happen if navigation is handled correctly
+                }
             }
             composable(
                 route = "info_equipo/{teamId}",
-                arguments = listOf(navArgument("teamId") { type = NavType.IntType })
+                arguments = listOf(navArgument("teamId") { type = NavType.StringType })
             ) { backStackEntry ->
-                val teamId = backStackEntry.arguments?.getInt("teamId") ?: 0
-                InfoEquipoScreen(teamId = teamId, onBack = { navController.popBackStack() })
+                val teamId = backStackEntry.arguments?.getString("teamId") ?: ""
+                InfoEquipoScreen(
+                    teamId = teamId,
+                    viewModel = viewModel,
+                    userId = currentUser?.uid ?: "",
+                    onBack = { navController.popBackStack() })
             }
             composable(
                 route = "lista_pokemon/{index}",
@@ -113,19 +127,15 @@ fun NavMenuScreen() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun Cabecera() {
-    CenterAlignedTopAppBar(
-        title = { Text("Pokemon App") },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = Color.Transparent
-        )
-    )
-}
 
 @Composable
-fun MenuInferior(navController: NavHostController, currentRoute: String?) {
+fun MenuInferior(
+    navController: NavHostController, 
+    currentRoute: String?, 
+    viewModel: MainViewModel
+) {
+    val currentUser by viewModel.currentUser.collectAsState()
+
     NavigationBar(
         modifier = Modifier
             .padding(start = 12.dp, end = 12.dp, bottom = 16.dp)
@@ -146,27 +156,18 @@ fun MenuInferior(navController: NavHostController, currentRoute: String?) {
 
             NavigationBarItem(
                 selected = isSelected,
-                label = {
-                    Text(
-                        text = label,
-                        color = if (isCrear) Color(0xFF2196F3) else if (isSelected) Color.White else Color.Gray
-                    )
-                },
-                icon = {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        tint = if (isCrear) Color(0xFF2196F3) else if (isSelected) Color.White else Color.Gray
-                    )
-                },
+                label = { Text(label, color = if (isCrear) Color(0xFF2196F3) else if (isSelected) Color.White else Color.Gray) },
+                icon = { Icon(icon, contentDescription = label, tint = if (isCrear) Color(0xFF2196F3) else if (isSelected) Color.White else Color.Gray) },
                 onClick = {
                     if (route == "crear") {
-                        navController.navigate("crear")
+                        if (currentUser != null) {
+                            navController.navigate("crear")
+                        } else {
+                            navController.navigate("perfil")
+                        }
                     } else {
                         navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -182,8 +183,8 @@ fun MenuInferior(navController: NavHostController, currentRoute: String?) {
 
 @Composable
 fun TeamList(
-    teams: List<Team>, 
-    onInfoClick: (Int) -> Unit,
+    teams: List<Equipo>, 
+    onInfoClick: (String) -> Unit,
     onProfileClick: () -> Unit
 ) {
     LazyColumn(
@@ -206,8 +207,26 @@ fun TeamList(
 
 
 @Composable
+fun GetUserName(userId: String, firestoreService: FirestoreService) {
+    var userName by remember { mutableStateOf("...") }
+
+    LaunchedEffect(userId) {
+        val user = firestoreService.getUser(userId)
+        userName = user?.name ?: "Usuario desconocido"
+    }
+
+    Text(
+        text = userName,
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color.Gray
+    )
+}
+
+
+@Composable
 fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: String, nombreCreador: String, showButtonInfo: Boolean) {
     var isFavorite by remember { mutableStateOf(false) }
+    val firestoreService = remember { FirestoreService() }
 
     Column(
         modifier = Modifier
@@ -265,12 +284,7 @@ fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: 
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.clickable { onProfileClick() }
                 )
-                Text(
-                    text = nombreCreador,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.clickable { onProfileClick() },
-                    color = Color.Gray
-                )
+                GetUserName(userId = nombreCreador, firestoreService = firestoreService)
             }
 
             Spacer(modifier = Modifier.weight(1f))

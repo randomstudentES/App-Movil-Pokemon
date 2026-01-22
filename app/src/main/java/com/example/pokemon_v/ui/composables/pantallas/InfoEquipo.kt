@@ -1,3 +1,4 @@
+
 package com.example.pokemon_v.ui.composables.pantallas
 
 import androidx.compose.foundation.layout.*
@@ -15,26 +16,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pokemon_v.ui.composables.TeamCard
 import com.example.pokemon_v.ui.composables.api.PokemonInfo
-import com.example.pokemon_v.ui.composables.api.Team
+import com.example.pokemon_v.ui.composables.api.getPokemonId
 import com.example.pokemon_v.ui.composables.api.getPokemonInfo
-import com.example.pokemon_v.ui.composables.api.getTeamById
+import com.example.pokemon_v.viewmodels.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InfoEquipoScreen(teamId: Int, onBack: () -> Unit) {
-    val teamState = produceState<Team?>(initialValue = null) {
-        value = getTeamById(teamId)
-    }
-    val team = teamState.value
+fun InfoEquipoScreen(
+    teamId: String,
+    viewModel: MainViewModel,
+    userId: String, // Keep for now, might be useful for edit/delete logic later
+    onBack: () -> Unit
+) {
+    // Search for the team in both the user's list and the global list
+    val userTeams by viewModel.teams.collectAsState()
+    val allTeams by viewModel.allTeams.collectAsState()
+    val team = userTeams.find { it.id == teamId } ?: allTeams.find { it.id == teamId }
 
     var pokemonDetails by remember { mutableStateOf<List<PokemonInfo>>(emptyList()) }
 
     LaunchedEffect(team) {
         team?.let { t ->
             val details = mutableListOf<PokemonInfo>()
-            t.pokemonIds.forEach { id ->
-                id?.let {
-                    val info = getPokemonInfo(it)
+            t.pokemons.forEach { pokemonName ->
+                val pokemonId = getPokemonId(pokemonName)
+                if (pokemonId != null) {
+                    val info = getPokemonInfo(pokemonId)
                     if (info != null) {
                         details.add(info)
                     }
@@ -120,6 +127,10 @@ fun InfoEquipoScreen(teamId: Int, onBack: () -> Unit) {
                     }
                 }
             } else {
+                // If team isn't found, it might not be loaded yet. Load the global list.
+                LaunchedEffect(Unit) {
+                    viewModel.loadAllTeams()
+                }
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }

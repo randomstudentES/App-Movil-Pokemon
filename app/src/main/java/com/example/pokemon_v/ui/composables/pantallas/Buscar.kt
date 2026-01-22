@@ -1,6 +1,10 @@
+
 package com.example.pokemon_v.ui.composables.pantallas
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -9,19 +13,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.pokemon_v.ui.composables.TeamList
-import com.example.pokemon_v.ui.composables.api.Team
-import com.example.pokemon_v.ui.composables.api.getTeams
+import com.example.pokemon_v.viewmodels.MainViewModel
 
 @Composable
 fun BuscarScreen(
-    onInfoClick: (Int) -> Unit,
+    viewModel: MainViewModel,
+    onInfoClick: (String) -> Unit,
     onProfileClick: () -> Unit
 ) {
     var searchText by remember { mutableStateOf("") }
-    val teamsState = produceState<List<Team>>(initialValue = emptyList()) {
-        value = getTeams()
+    val allTeams by viewModel.allTeams.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadAllTeams()
     }
-    val teams = teamsState.value
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -45,7 +50,7 @@ fun BuscarScreen(
         )
 
         TeamList(
-            teams = teams.filter { it.nombre.contains(searchText, ignoreCase = true) },
+            teams = allTeams.filter { it.nombre.contains(searchText, ignoreCase = true) },
             onInfoClick = onInfoClick,
             onProfileClick = onProfileClick
         )

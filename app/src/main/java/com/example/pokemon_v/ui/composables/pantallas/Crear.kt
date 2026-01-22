@@ -1,3 +1,4 @@
+
 package com.example.pokemon_v.ui.composables.pantallas
 
 import androidx.activity.compose.BackHandler
@@ -16,28 +17,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import com.example.pokemon_v.ui.composables.api.saveTeam
-import kotlinx.coroutines.launch
+import com.example.pokemon_v.models.Equipo
+import com.example.pokemon_v.viewmodels.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CrearScreen(
     navController: NavHostController,
+    viewModel: MainViewModel,
+    userId: String,
     onBack: () -> Unit, 
     onAddPokemonClick: (Int) -> Unit
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    
-    // Usamos rememberSaveable para que los datos sobrevivan a la navegación
     var teamName by rememberSaveable { mutableStateOf("") }
     var selectedPokemons by rememberSaveable { 
         mutableStateOf(listOf<String?>(null, null, null, null, null, null)) 
     }
     
-    // Estado para controlar la visibilidad del diálogo de confirmación
     var showExitConfirmation by remember { mutableStateOf(false) }
 
-    // Función para manejar el intento de salida
     val handleExitAttempt = {
         if (teamName.isNotBlank() || selectedPokemons.any { it != null }) {
             showExitConfirmation = true
@@ -46,12 +44,10 @@ fun CrearScreen(
         }
     }
 
-    // Manejar el botón de atrás del sistema
     BackHandler(enabled = true) {
         handleExitAttempt()
     }
 
-    // Diálogo de confirmación
     if (showExitConfirmation) {
         AlertDialog(
             onDismissRequest = { showExitConfirmation = false },
@@ -75,14 +71,10 @@ fun CrearScreen(
         )
     }
 
-    // Obtenemos el SavedStateHandle de la entrada actual
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
-
-    // Observamos los flujos de datos
     val resultState = savedStateHandle?.getStateFlow<String?>("selected_pokemon", null)?.collectAsState()
     val targetIndexState = savedStateHandle?.getStateFlow<Int?>("target_index", null)?.collectAsState()
 
-    // Procesamos el resultado cuando cambia
     LaunchedEffect(resultState?.value, targetIndexState?.value) {
         val name = resultState?.value
         val index = targetIndexState?.value
@@ -93,7 +85,6 @@ fun CrearScreen(
                 newList[index] = name
                 selectedPokemons = newList
             }
-            // Limpiamos el handle
             savedStateHandle.remove<String>("selected_pokemon")
             savedStateHandle.remove<Int>("target_index")
         }
@@ -153,19 +144,14 @@ fun CrearScreen(
 
             Button(
                 onClick = {
-                    coroutineScope.launch {
-                        val newTeamId = saveTeam(
-                            nombre = teamName,
-                            creatorId = 1,
-                            pokemonIds = selectedPokemons
-                        )
-                        if (newTeamId != null) {
-                            // Navegar a la pantalla de info del nuevo equipo
-                            navController.navigate("info_equipo/$newTeamId") {
-                                // Limpiar el historial para que al volver no regrese a "Crear"
-                                popUpTo("perfil") { inclusive = false }
-                            }
-                        }
+                    val newTeam = Equipo(
+                        nombre = teamName,
+                        creador = userId, // This should be the current user's name or ID
+                        pokemons = selectedPokemons.filterNotNull()
+                    )
+                    viewModel.createTeam(userId, newTeam)
+                    navController.navigate("perfil") { 
+                        popUpTo("perfil") { inclusive = true }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

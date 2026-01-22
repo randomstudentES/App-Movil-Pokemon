@@ -30,6 +30,24 @@ data class PokemonInfo(
 private val client = OkHttpClient()
 private val gson = Gson()
 
+// NEW FUNCTION to get ID from name
+suspend fun getPokemonId(pokemonName: String): Int? = withContext(Dispatchers.IO) {
+    try {
+        val request = Request.Builder()
+            .url("https://pokeapi.co/api/v2/pokemon/${pokemonName.lowercase()}")
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@withContext null
+            val body = response.body?.string() ?: return@withContext null
+            val jsonObject = gson.fromJson(body, JsonObject::class.java)
+            jsonObject.get("id").asInt
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
 suspend fun getPokemonInfo(pokemonId: Int): PokemonInfo? = withContext(Dispatchers.IO) {
     try {
         val request = Request.Builder()

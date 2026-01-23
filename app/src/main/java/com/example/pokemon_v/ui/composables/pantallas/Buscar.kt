@@ -52,7 +52,11 @@ fun BuscarScreen(
         TeamList(
             teams = allTeams.filter { it.nombre.contains(searchText, ignoreCase = true) },
             onInfoClick = onInfoClick,
-            onProfileClick = onProfileClick
+            onProfileClick = onProfileClick,
+            onDeleteClick = {},
+            onEditClick = {},
+            showEditButton = false,
+            showDeleteButton = false
         )
     }
 }

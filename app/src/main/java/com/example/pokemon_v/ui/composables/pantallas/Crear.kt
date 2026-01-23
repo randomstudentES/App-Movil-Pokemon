@@ -8,16 +8,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
 import com.example.pokemon_v.models.Equipo
+import com.example.pokemon_v.ui.composables.api.mappers.NameTranslator
+import com.example.pokemon_v.utils.readPokemonFromCsv
 import com.example.pokemon_v.viewmodels.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,15 +29,35 @@ fun CrearScreen(
     navController: NavHostController,
     viewModel: MainViewModel,
     userId: String,
-    onBack: () -> Unit, 
+    teamId: String?,
+    onBack: () -> Unit,
     onAddPokemonClick: (Int) -> Unit
 ) {
     var teamName by rememberSaveable { mutableStateOf("") }
-    var selectedPokemons by rememberSaveable { 
-        mutableStateOf(listOf<String?>(null, null, null, null, null, null)) 
+    var selectedPokemons by rememberSaveable {
+        mutableStateOf(listOf<String?>(null, null, null, null, null, null))
     }
     
     var showExitConfirmation by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val pokemonData = remember { readPokemonFromCsv(context) }
+
+    val teams by viewModel.teams.collectAsState()
+
+    LaunchedEffect(teamId, teams) {
+        if (teamId != null) {
+            val team = teams.find { it.id == teamId }
+            if (team != null) {
+                teamName = team.nombre
+                val pokemons = ArrayList<String?>(team.pokemons)
+                while (pokemons.size < 6) {
+                    pokemons.add(null)
+                }
+                selectedPokemons = pokemons.toList()
+            }
+        }
+    }
 
     val handleExitAttempt = {
         if (teamName.isNotBlank() || selectedPokemons.any { it != null }) {
@@ -76,13 +99,13 @@ fun CrearScreen(
     val targetIndexState = savedStateHandle?.getStateFlow<Int?>("target_index", null)?.collectAsState()
 
     LaunchedEffect(resultState?.value, targetIndexState?.value) {
-        val name = resultState?.value
+        val id = resultState?.value
         val index = targetIndexState?.value
         
-        if (name != null && index != null) {
+        if (id != null && index != null) {
             val newList = selectedPokemons.toMutableList()
             if (index in 0 until 6) {
-                newList[index] = name
+                newList[index] = id
                 selectedPokemons = newList
             }
             savedStateHandle.remove<String>("selected_pokemon")
@@ -94,7 +117,7 @@ fun CrearScreen(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Crear Equipo") },
+                title = { Text(if (teamId == null) "Crear Equipo" else "Editar Equipo") },
                 navigationIcon = {
                     IconButton(onClick = handleExitAttempt) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -121,22 +144,36 @@ fun CrearScreen(
                 singleLine = true
             )
 
-            selectedPokemons.forEachIndexed { index, pokemon ->
+            selectedPokemons.forEachIndexed { index, pokemonId ->
                 Button(
                     onClick = { onAddPokemonClick(index) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (pokemon != null) Color(0xFFE3F2FD) else MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = if (pokemon != null) Color(0xFF1976D2) else MaterialTheme.colorScheme.onSecondaryContainer
+                        containerColor = if (pokemonId != null) Color(0xFFE3F2FD) else MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = if (pokemonId != null) Color(0xFF1976D2) else MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 ) {
-                    Icon(
-                        imageVector = if (pokemon != null) Icons.Default.Check else Icons.Default.Add, 
-                        contentDescription = null
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(text = if (pokemon != null) "Pokémon $pokemon" else "Añadir Pokémon")
+                    if (pokemonId != null) {
+                        val pokemonName = pokemonData.find { it.first == pokemonId }?.second ?: "???"
+                        val translatedName = NameTranslator.translate(pokemonName)
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AsyncImage(
+                                model = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png",
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(text = translatedName)
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(text = "Añadir Pokémon")
+                        }
+                    }
                 }
             }
 
@@ -144,12 +181,17 @@ fun CrearScreen(
 
             Button(
                 onClick = {
-                    val newTeam = Equipo(
+                    val team = Equipo(
+                        id = teamId ?: "",
                         nombre = teamName,
-                        creador = userId, // This should be the current user's name or ID
+                        creador = userId, 
                         pokemons = selectedPokemons.filterNotNull()
                     )
-                    viewModel.createTeam(userId, newTeam)
+                    if (teamId == null) {
+                        viewModel.createTeam(userId, team)
+                    } else {
+                        viewModel.updateTeam(userId, team)
+                    }
                     navController.navigate("perfil") { 
                         popUpTo("perfil") { inclusive = true }
                     }
@@ -157,7 +199,7 @@ fun CrearScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = teamName.isNotBlank() && selectedPokemons.any { it != null }
             ) {
-                Text("Guardar Equipo")
+                Text(if (teamId == null) "Guardar Equipo" else "Actualizar Equipo")
             }
         }
     }

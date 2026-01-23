@@ -29,7 +29,11 @@ fun ParaTiScreen(
         TeamList(
             teams = allTeams, 
             onInfoClick = onInfoClick,
-            onProfileClick = onProfileClick
+            onProfileClick = onProfileClick,
+            onDeleteClick = {},
+            onEditClick = {},
+            showEditButton = false,
+            showDeleteButton = false
         )
     }
 }

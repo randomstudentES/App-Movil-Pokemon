@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.ui.composables.TeamCard
 import com.example.pokemon_v.ui.composables.api.PokemonInfo
 import com.example.pokemon_v.ui.composables.api.getPokemonId
@@ -25,10 +27,11 @@ import com.example.pokemon_v.viewmodels.MainViewModel
 fun InfoEquipoScreen(
     teamId: String,
     viewModel: MainViewModel,
-    userId: String, // Keep for now, might be useful for edit/delete logic later
-    onBack: () -> Unit
+    userId: String,
+    onBack: () -> Unit,
+    onEditClick: (String) -> Unit,
+    onDeleteClick: (Equipo) -> Unit
 ) {
-    // Search for the team in both the user's list and the global list
     val userTeams by viewModel.teams.collectAsState()
     val allTeams by viewModel.allTeams.collectAsState()
     val team = userTeams.find { it.id == teamId } ?: allTeams.find { it.id == teamId }
@@ -80,7 +83,11 @@ fun InfoEquipoScreen(
                     onProfileClick = {},
                     nombreEquipo = team.nombre,
                     nombreCreador = team.creador,
-                    showButtonInfo = false
+                    showButtonInfo = false,
+                    onEditClick = { onEditClick(team.id) },
+                    showEditButton = userId == team.creador,
+                    onDeleteClick = { onDeleteClick(team) },
+                    showDeleteButton = userId == team.creador
                 )
 
                 Text(
@@ -105,7 +112,8 @@ fun InfoEquipoScreen(
                                 modifier = Modifier
                                     .padding(16.dp)
                                     .fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
                                     Text(
@@ -122,12 +130,16 @@ fun InfoEquipoScreen(
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 }
+                                AsyncImage(
+                                    model = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png",
+                                    contentDescription = null,
+                                    modifier = Modifier.size(72.dp)
+                                )
                             }
                         }
                     }
                 }
             } else {
-                // If team isn't found, it might not be loaded yet. Load the global list.
                 LaunchedEffect(Unit) {
                     viewModel.loadAllTeams()
                 }

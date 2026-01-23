@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -34,6 +35,7 @@ import com.example.pokemon_v.ui.composables.pantallas.*
 import com.example.pokemon_v.viewmodels.MainViewModel
 import com.example.pokemon_v.viewmodels.MainViewModelFactory
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true)
 @Composable
 fun NavMenuScreen() {
@@ -47,7 +49,58 @@ fun NavMenuScreen() {
     val currentUser by viewModel.currentUser.collectAsState()
 
     val fullScreens = listOf("crear", "info_equipo", "lista_pokemon/{index}")
-    val showScaffold = currentRoute != null && !fullScreens.any { currentRoute!!.startsWith(it.split("/")[0]) }
+    val showScaffold = currentRoute != null && !fullScreens.any { currentRoute.startsWith(it.split("/")[0]) }
+
+    // --- Delete Confirmation Dialog State ---
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var teamToDelete by remember { mutableStateOf<Equipo?>(null) }
+    var teamNameToDelete by remember { mutableStateOf("") }
+
+    val onDeleteRequest = { team: Equipo ->
+        teamToDelete = team
+        showDeleteConfirmation = true
+    }
+
+    if (showDeleteConfirmation && teamToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Eliminar Equipo") },
+            text = {
+                Column {
+                    Text("Para confirmar, escribe el nombre del equipo: '${teamToDelete!!.nombre}'")
+                    OutlinedTextField(
+                        value = teamNameToDelete,
+                        onValueChange = { teamNameToDelete = it },
+                        label = { Text("Nombre del equipo") },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (teamNameToDelete == teamToDelete!!.nombre) {
+                            viewModel.deleteTeam(currentUser!!.uid, teamToDelete!!.id)
+                            showDeleteConfirmation = false
+                            teamNameToDelete = ""
+                            navController.popBackStack()
+                        }
+                    },
+                    enabled = teamNameToDelete == teamToDelete!!.nombre
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                Button(onClick = {
+                    showDeleteConfirmation = false
+                    teamNameToDelete = ""
+                }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -68,7 +121,9 @@ fun NavMenuScreen() {
                 PerfilScreen(
                     viewModel = viewModel,
                     onCrearClick = { navController.navigate("crear") },
-                    onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") }
+                    onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
+                    onEditClick = { teamId -> navController.navigate("crear?teamId=$teamId") },
+                    onDeleteClick = onDeleteRequest
                 ) 
             }
             composable("buscar") { 
@@ -85,19 +140,24 @@ fun NavMenuScreen() {
                     onProfileClick = { navController.navigate("perfil") }
                 ) 
             }
-            composable("crear") {
-                if (currentUser != null) {
-                    CrearScreen(
-                        navController = navController,
-                        viewModel = viewModel,
-                        userId = currentUser!!.uid,
-                        onBack = { navController.popBackStack() },
-                        onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
-                    )
-                } else {
-                    // This should not happen if navigation is handled correctly
-                }
-            }
+            composable(
+    route = "crear?teamId={teamId}",
+    arguments = listOf(navArgument("teamId") { nullable = true })
+) {
+    if (currentUser != null) {
+        val teamId = it.arguments?.getString("teamId")
+        CrearScreen(
+            navController = navController,
+            viewModel = viewModel,
+            userId = currentUser!!.uid,
+            teamId = teamId,
+            onBack = { navController.popBackStack() },
+            onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
+        )
+    } else {
+        // This should not happen if navigation is handled correctly
+    }
+}
             composable(
                 route = "info_equipo/{teamId}",
                 arguments = listOf(navArgument("teamId") { type = NavType.StringType })
@@ -107,7 +167,10 @@ fun NavMenuScreen() {
                     teamId = teamId,
                     viewModel = viewModel,
                     userId = currentUser?.uid ?: "",
-                    onBack = { navController.popBackStack() })
+                    onBack = { navController.popBackStack() },
+                    onEditClick = { teamId -> navController.navigate("crear?teamId=$teamId") },
+                    onDeleteClick = onDeleteRequest
+                )
             }
             composable(
                 route = "lista_pokemon/{index}",
@@ -185,21 +248,27 @@ fun MenuInferior(
 fun TeamList(
     teams: List<Equipo>, 
     onInfoClick: (String) -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onDeleteClick: (Equipo) -> Unit, 
+    onEditClick: (String) -> Unit,
+    showEditButton: Boolean,
+    showDeleteButton: Boolean
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        items(teams.size) { index ->
-            val team = teams[index]
-
+        items(teams) { team ->
             TeamCard(
                 onInfoClick = { onInfoClick(team.id) },
                 onProfileClick = onProfileClick,
                 nombreEquipo = team.nombre,
                 nombreCreador = team.creador,
-                showButtonInfo = true
+                showButtonInfo = true,
+                onDeleteClick = { onDeleteClick(team) },
+                onEditClick = { onEditClick(team.id) },
+                showEditButton = showEditButton,
+                showDeleteButton = showDeleteButton
             )
         }
     }
@@ -224,7 +293,17 @@ fun GetUserName(userId: String, firestoreService: FirestoreService) {
 
 
 @Composable
-fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: String, nombreCreador: String, showButtonInfo: Boolean) {
+fun TeamCard(
+    onInfoClick: () -> Unit, 
+    onProfileClick: () -> Unit, 
+    nombreEquipo: String, 
+    nombreCreador: String, 
+    showButtonInfo: Boolean, 
+    onEditClick: () -> Unit = {}, 
+    showEditButton: Boolean = false, 
+    onDeleteClick: () -> Unit = {},
+    showDeleteButton: Boolean = false
+) {
     var isFavorite by remember { mutableStateOf(false) }
     val firestoreService = remember { FirestoreService() }
 
@@ -280,7 +359,7 @@ fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: 
 
             Column {
                 Text(
-                    text = nombreEquipo,
+                    text = if (nombreEquipo.length > 10) "${nombreEquipo.take(10)}..." else nombreEquipo,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.clickable { onProfileClick() }
                 )
@@ -289,19 +368,38 @@ fun TeamCard(onInfoClick: () -> Unit, onProfileClick: () -> Unit, nombreEquipo: 
 
             Spacer(modifier = Modifier.weight(1f))
 
-            if (showButtonInfo) {
-                OutlinedButton(
-                    onClick = onInfoClick,
-                    shape = RoundedCornerShape(12.dp),
-                    border = ButtonDefaults.outlinedButtonBorder.copy(width = 2.dp)
-                ) {
-                    Text(
-                        text = "info",
-                        color = Color.Black
-                    )
+            Row {
+                if (showButtonInfo) {
+                    OutlinedButton(
+                        onClick = onInfoClick,
+                        shape = RoundedCornerShape(12.dp),
+                        border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(width = 2.dp)
+                    ) {
+                        Text(
+                            text = "info",
+                            color = Color.Black
+                        )
+                    }
+                }
+    
+                if (showEditButton) {
+                    OutlinedButton(
+                        onClick = onEditClick,
+                        shape = RoundedCornerShape(12.dp),
+                        border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(width = 2.dp)
+                    ) {
+                        Text(
+                            text = "Editar",
+                            color = Color.Black
+                        )
+                    }
+                }
+                if (showDeleteButton) {
+                    IconButton(onClick = onDeleteClick) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
-
         }
     }
 }

@@ -67,6 +67,16 @@ class FirestoreService {
         }
     }
 
+    suspend fun updateUser(user: Usuario) {
+        if (user.uid.isNotEmpty()) {
+            try {
+                usuariosCollection.document(user.uid).set(user).await()
+            } catch (e: Exception) {
+                Log.e("FirestoreService", "Error updating user", e)
+            }
+        }
+    }
+
     // Team operations
     suspend fun createTeam(userId: String, team: Equipo) {
         try {
@@ -107,8 +117,8 @@ class FirestoreService {
         }
     }
 
-    suspend fun updateTeam(team: Equipo) {
-        if (team.id.isNotEmpty()) {
+    suspend fun updateTeam(userId: String, team: Equipo) {
+        if (team.id.isNotEmpty() && team.creador == userId) {
             try {
                 equiposCollection.document(team.id).set(team).await()
             } catch (e: Exception) {

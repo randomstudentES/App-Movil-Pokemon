@@ -20,28 +20,52 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
 
     private val _allTeams = MutableStateFlow<List<Equipo>>(emptyList())
     val allTeams: StateFlow<List<Equipo>> = _allTeams
+    
+    private val _apiError = MutableStateFlow<String?>(null)
+    val apiError: StateFlow<String?> = _apiError
+
+    fun clearApiError() {
+        _apiError.value = null
+    }
 
     // Auth Functions
     fun login(name: String, password: String) {
         viewModelScope.launch {
+            _apiError.value = null
             val user = firestoreService.login(name, password)
             _currentUser.value = user
             if (user != null) {
                 loadTeams(user.uid)
+            } else {
+                _apiError.value = "Nombre de usuario o contraseña incorrectos."
             }
         }
     }
 
     fun register(user: Usuario) {
         viewModelScope.launch {
+            _apiError.value = null
             val newUser = firestoreService.register(user)
             _currentUser.value = newUser
+            if (newUser == null) {
+                _apiError.value = "El nombre de usuario ya existe."
+            }
         }
     }
 
     fun logout() {
         _currentUser.value = null
         _teams.value = emptyList()
+    }
+
+    fun updateUserDescription(description: String) {
+        viewModelScope.launch {
+            _currentUser.value?.let {
+                val updatedUser = it.copy(description = description)
+                firestoreService.updateUser(updatedUser)
+                _currentUser.value = updatedUser
+            }
+        }
     }
 
     // Team Functions
@@ -64,10 +88,10 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
         }
     }
 
-    fun updateTeam(team: Equipo) {
+    fun updateTeam(userId: String, team: Equipo) {
         viewModelScope.launch {
-            firestoreService.updateTeam(team)
-            // You might want to reload the user's teams if the updated team belongs to the current user.
+            firestoreService.updateTeam(userId, team)
+            loadTeams(userId)
         }
     }
 

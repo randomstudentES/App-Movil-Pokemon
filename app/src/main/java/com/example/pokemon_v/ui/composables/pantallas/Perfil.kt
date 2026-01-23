@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.models.Usuario
 import com.example.pokemon_v.ui.composables.TeamList
 import com.example.pokemon_v.viewmodels.MainViewModel
@@ -29,14 +30,22 @@ import com.example.pokemon_v.viewmodels.MainViewModel
 fun PerfilScreen(
     viewModel: MainViewModel,
     onCrearClick: () -> Unit, 
-    onInfoClick: (String) -> Unit
+    onInfoClick: (String) -> Unit,
+    onEditClick: (String) -> Unit,
+    onDeleteClick: (Equipo) -> Unit
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
     
     if (currentUser == null) {
         LoginRegisterScreen(viewModel = viewModel)
     } else {
-        ProfileView(viewModel = viewModel, onCrearClick = onCrearClick, onInfoClick = onInfoClick)
+        ProfileView(
+            viewModel = viewModel, 
+            onCrearClick = onCrearClick, 
+            onInfoClick = onInfoClick, 
+            onEditClick = onEditClick,
+            onDeleteClick = onDeleteClick
+        )
     }
 }
 
@@ -45,12 +54,29 @@ fun PerfilScreen(
 fun ProfileView(
     viewModel: MainViewModel,
     onCrearClick: () -> Unit, 
-    onInfoClick: (String) -> Unit
+    onInfoClick: (String) -> Unit,
+    onEditClick: (String) -> Unit,
+    onDeleteClick: (Equipo) -> Unit
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
     val teams by viewModel.teams.collectAsState()
     var showMenu by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var isEditingDescription by remember { mutableStateOf(false) }
+    var descriptionText by remember { mutableStateOf(currentUser?.description ?: "") }
+    var showNotImplementedDialog by remember { mutableStateOf(false) }
+
+    if (showNotImplementedDialog) {
+        AlertDialog(
+            onDismissRequest = { showNotImplementedDialog = false },
+            text = { Text("Por implementar") },
+            confirmButton = {
+                TextButton(onClick = { showNotImplementedDialog = false }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     LaunchedEffect(currentUser) {
         currentUser?.let { user ->
@@ -75,7 +101,24 @@ fun ProfileView(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
-                        DropdownMenuItem(text = { Text("Logout") }, onClick = { viewModel.logout() })
+                        DropdownMenuItem(
+                            text = { Text("Modificar foto de perfil") }, 
+                            onClick = { 
+                                showNotImplementedDialog = true
+                                showMenu = false 
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Eliminar foto de perfil") }, 
+                            onClick = { 
+                                showNotImplementedDialog = true
+                                showMenu = false
+                            }
+                        )
+                        DropdownMenuItem(text = { Text("Cerrar Sesión") }, onClick = { 
+                            viewModel.logout()
+                            showMenu = false
+                        })
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -89,20 +132,45 @@ fun ProfileView(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = currentUser?.description ?: "",
-                fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            if (isEditingDescription) {
+                OutlinedTextField(
+                    value = descriptionText,
+                    onValueChange = { descriptionText = it },
+                    label = { Text("Tu descripción") },
+                    modifier = Modifier.fillMaxWidth().height(120.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                Row {
+                    Button(onClick = { 
+                        viewModel.updateUserDescription(descriptionText)
+                        isEditingDescription = false
+                    }) {
+                        Text("Guardar")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = { 
+                        isEditingDescription = false
+                        descriptionText = currentUser?.description ?: ""
+                    }) {
+                        Text("Cancelar")
+                    }
+                }
+            } else {
+                Text(
+                    text = currentUser?.description ?: "",
+                    fontSize = 18.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
 
-            OutlinedButton(
-                onClick = { /* Modificar descripción */ },
-                modifier = Modifier.height(32.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-            ) {
-                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Modificar", fontSize = 12.sp)
+                OutlinedButton(
+                    onClick = { isEditingDescription = true },
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Modificar descripción", fontSize = 12.sp)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -126,12 +194,16 @@ fun ProfileView(
             TeamList(
                 teams = teams,
                 onInfoClick = onInfoClick,
-                onProfileClick = { }
+                onProfileClick = {},
+                onDeleteClick = onDeleteClick,
+                onEditClick = onEditClick,
+                showEditButton = false,
+                showDeleteButton = true
             )
         }
     }
 
-    if (alertMessage != null) {
+    alertMessage?.let { message ->
         AlertDialog(
             onDismissRequest = { alertMessage = null },
             confirmButton = {
@@ -139,7 +211,7 @@ fun ProfileView(
                     Text("OK")
                 }
             },
-            text = { Text(alertMessage!!) }
+            text = { Text(message) }
         )
     }
 }
@@ -151,16 +223,23 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
     var isLogin by remember { mutableStateOf(true) }
     var name by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var apiError by remember { mutableStateOf<String?>(null) }
+    var confirmPassword by remember { mutableStateOf("") }
+    val apiError by viewModel.apiError.collectAsState()
     var passwordError by remember { mutableStateOf<String?>(null) }
+    var confirmPasswordError by remember { mutableStateOf<String?>(null) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
 
     fun validatePassword(pass: String): String? {
         if (pass.length <= 8) return "La contraseña debe tener más de 8 caracteres."
         if (!pass.any { it.isUpperCase() }) return "Debe contener una mayúscula."
         if (!pass.any { it.isDigit() }) return "Debe contener un número."
         if (!pass.any { !it.isLetterOrDigit() }) return "Debe contener un carácter especial."
+        return null
+    }
+
+    fun validateConfirmPassword(pass1: String, pass2: String): String? {
+        if (pass1 != pass2) return "Las contraseñas no coinciden."
         return null
     }
 
@@ -176,21 +255,26 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
 
         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre de usuario") })
         Spacer(modifier = Modifier.height(8.dp))
+
+        val isPasswordError = !isLogin && password.isNotEmpty() && passwordError != null
         OutlinedTextField(
             value = password,
-            onValueChange = {
+            onValueChange = { 
                 password = it
                 if (!isLogin) {
                     passwordError = validatePassword(it)
+                    if (confirmPassword.isNotEmpty()) {
+                        confirmPasswordError = validateConfirmPassword(it, confirmPassword)
+                    }
                 }
             },
             label = { Text("Contraseña") },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            isError = !isLogin && password.isNotEmpty() && passwordError != null,
+            isError = isPasswordError,
             supportingText = {
-                if (!isLogin && password.isNotEmpty() && passwordError != null) {
-                    passwordError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (isPasswordError) {
+                    passwordError?.let { Text(it) }
                 }
             },
             trailingIcon = {
@@ -202,23 +286,45 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
         )
         if (!isLogin) {
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Descripción (opcional)") })
+
+            val isConfirmPasswordError = !isLogin && confirmPassword.isNotEmpty() && confirmPasswordError != null
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { 
+                    confirmPassword = it
+                    confirmPasswordError = validateConfirmPassword(password, it)
+                },
+                label = { Text("Confirmar contraseña") },
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                isError = isConfirmPasswordError,
+                supportingText = {
+                    if (isConfirmPasswordError) {
+                        confirmPasswordError?.let { Text(it) }
+                    }
+                },
+                trailingIcon = {
+                    val image = if (confirmPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(imageVector = image, contentDescription = "Toggle password visibility")
+                    }
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = {
-                apiError = null
                 if (isLogin) {
                     viewModel.login(name, password)
                 } else {
-                    val newUser = Usuario(name = name, password = password, description = description)
+                    val newUser = Usuario(name = name, password = password, description = "")
                     viewModel.register(newUser)
                 }
             },
             enabled = if (isLogin) name.isNotBlank() && password.isNotBlank()
-                      else name.isNotBlank() && password.isNotBlank() && passwordError == null
+                      else name.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank() && passwordError == null && confirmPasswordError == null
         ) {
             Text(if (isLogin) "Entrar" else "Registrarse")
         }
@@ -231,7 +337,9 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = if (isLogin) "¿No tienes cuenta? Regístrate" else "¿Ya tienes cuenta? Inicia sesión",
-            modifier = Modifier.clickable { isLogin = !isLogin },
+            modifier = Modifier.clickable { 
+                isLogin = !isLogin 
+            },
             color = MaterialTheme.colorScheme.primary
         )
     }

@@ -84,7 +84,15 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
 
     fun loadAllTeams() {
         viewModelScope.launch {
-            _allTeams.value = firestoreService.getAllTeams()
+            val allTeamsList = firestoreService.getAllTeams()
+            val currentUserId = _currentUser.value?.uid
+
+            // Filtramos la lista: solo incluimos equipos donde el creadorId NO sea el del usuario actual
+            _allTeams.value = if (currentUserId != null) {
+                allTeamsList.filter { it.creador != currentUserId }
+            } else {
+                allTeamsList
+            }
         }
     }
 

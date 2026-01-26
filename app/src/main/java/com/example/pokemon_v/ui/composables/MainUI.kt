@@ -2,6 +2,7 @@
 package com.example.pokemon_v.ui.composables
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +35,7 @@ import com.example.pokemon_v.services.FirestoreService
 import com.example.pokemon_v.ui.composables.pantallas.*
 import com.example.pokemon_v.viewmodels.MainViewModel
 import com.example.pokemon_v.viewmodels.MainViewModelFactory
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true)
@@ -264,6 +266,7 @@ fun TeamList(
                 onProfileClick = onProfileClick,
                 nombreEquipo = team.nombre,
                 nombreCreador = team.creador,
+                pokemons = team.pokemons,
                 showButtonInfo = true,
                 onDeleteClick = { onDeleteClick(team) },
                 onEditClick = { onEditClick(team.id) },
@@ -291,6 +294,45 @@ fun GetUserName(userId: String, firestoreService: FirestoreService) {
     )
 }
 
+@Composable
+fun TeamComposition(pokemonIds: List<String>, modifier: Modifier = Modifier) {
+    val colores = arrayOf("f9e0e0", "ffece3", "feffda", "deffa0", "d0fff8")
+
+    val randomHex = colores.random()
+    val color = "FF$randomHex".toLong(16)
+
+    BoxWithConstraints(
+        modifier = modifier.aspectRatio(640f / 480f).background(Color(color))
+    ) {
+        val w = maxWidth
+        val h = maxHeight
+        val imageSize = w / 5f
+
+        val positions = listOf(
+            Pair(60f / 640f, 140f / 480f),
+            Pair(140f / 640f, 180f / 480f),
+            Pair(220f / 640f, 200f / 480f),
+            Pair(300f / 640f, 200f / 480f),
+            Pair(380f / 640f, 180f / 480f),
+            Pair(460f / 640f, 140f / 480f)
+        )
+
+        pokemonIds.take(6).forEachIndexed { index, id ->
+            if (id.isNotEmpty()) {
+                val (relX, relY) = positions[index]
+                AsyncImage(
+                    model = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png",
+                    contentDescription = null,
+                    modifier = Modifier
+                        .offset(x = w * relX, y = h * relY)
+                        .size(imageSize),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 fun TeamCard(
@@ -298,6 +340,7 @@ fun TeamCard(
     onProfileClick: () -> Unit, 
     nombreEquipo: String, 
     nombreCreador: String, 
+    pokemons: List<String> = emptyList(),
     showButtonInfo: Boolean, 
     onEditClick: () -> Unit = {}, 
     showEditButton: Boolean = false, 
@@ -318,12 +361,19 @@ fun TeamCard(
                 .height(200.dp)
                 .clip(RoundedCornerShape(24.dp))
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.placeholder),
-                contentDescription = "Imagen del equipo",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+            if (pokemons.isEmpty()) {
+                Image(
+                    painter = painterResource(id = R.drawable.placeholder),
+                    contentDescription = "Imagen del equipo",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                TeamComposition(
+                    pokemonIds = pokemons,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             IconButton(
                 onClick = { isFavorite = !isFavorite },

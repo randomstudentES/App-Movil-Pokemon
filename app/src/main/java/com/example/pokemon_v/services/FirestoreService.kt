@@ -4,6 +4,7 @@ package com.example.pokemon_v.services
 import android.util.Log
 import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.models.Usuario
+import com.example.pokemon_v.utils.SecurityUtils
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
@@ -23,11 +24,21 @@ class FirestoreService {
         return try {
             val snapshot = usuariosCollection
                 .whereEqualTo("name", name)
-                .whereEqualTo("password", password) // Insecure!
                 .limit(1)
                 .get()
                 .await()
-            snapshot.toObjects(Usuario::class.java).firstOrNull()
+            
+            val user = snapshot.toObjects(Usuario::class.java).firstOrNull()
+            if (user != null) {
+                val hashedAttempt = SecurityUtils.hashPassword(password, user.salt)
+                if (hashedAttempt == user.password) {
+                    user
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
         } catch (e: Exception) {
             Log.e("FirestoreService", "Error logging in", e)
             null
@@ -40,7 +51,17 @@ class FirestoreService {
             val existingUser = usuariosCollection.whereEqualTo("name", user.name).get().await()
             if (existingUser.isEmpty) {
                 val userId = UUID.randomUUID().toString()
-                val newUser = user.copy(uid = userId)
+                
+                // Hash the password before saving
+                val salt = SecurityUtils.generateSalt()
+                val hashedPassword = SecurityUtils.hashPassword(user.password, salt)
+                
+                val newUser = user.copy(
+                    uid = userId, 
+                    password = hashedPassword,
+                    salt = salt
+                )
+                
                 usuariosCollection.document(userId).set(newUser).await()
                 newUser
             } else {
@@ -70,8 +91,6 @@ class FirestoreService {
     suspend fun updateUser(user: Usuario) {
         if (user.uid.isNotEmpty()) {
             try {
-                // Usamos update para evitar sobrescribir todo el objeto si solo queremos actualizar campos básicos
-                // Pero como este método recibe el objeto completo, si se quiere ser precavido es mejor usar updates específicos
                 usuariosCollection.document(user.uid).set(user).await()
             } catch (e: Exception) {
                 Log.e("FirestoreService", "Error updating user", e)
@@ -92,14 +111,9 @@ class FirestoreService {
     // Team operations
     suspend fun createTeam(userId: String, team: Equipo) {
         try {
-            // Create a document reference with a new ID in the 'equipos' collection
             val teamDocument = equiposCollection.document()
-            // Create a new team object that includes the generated ID
             val teamWithId = team.copy(id = teamDocument.id, creador = userId)
-            // Set the new team object in the document
             teamDocument.set(teamWithId).await()
-            
-            // Add the new team's ID to the user's list of teamIds
             usuariosCollection.document(userId).update("teamIds", FieldValue.arrayUnion(teamWithId.id)).await()
         } catch (e: Exception) {
             Log.e("FirestoreService", "Error creating team", e)
@@ -110,7 +124,6 @@ class FirestoreService {
         try {
             val user = getUser(userId)
             if (user != null && user.teamIds.isNotEmpty()) {
-                // Fetch all team documents where the document ID is in the user's teamIds list.
                 val teamsSnapshot = equiposCollection.whereIn(FieldPath.documentId(), user.teamIds).get().await()
                 return teamsSnapshot.toObjects(Equipo::class.java)
             }
@@ -141,9 +154,7 @@ class FirestoreService {
 
     suspend fun deleteTeam(userId: String, teamId: String) {
         try {
-            // Delete the team document from the 'equipos' collection
             equiposCollection.document(teamId).delete().await()
-            // Remove the teamId from the user's 'teamIds' list
             usuariosCollection.document(userId).update("teamIds", FieldValue.arrayRemove(teamId)).await()
         } catch (e: Exception) {
             Log.e("FirestoreService", "Error deleting team", e)

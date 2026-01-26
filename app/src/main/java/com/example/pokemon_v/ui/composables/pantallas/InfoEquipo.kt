@@ -83,6 +83,7 @@ fun InfoEquipoScreen(
                     onProfileClick = {},
                     nombreEquipo = team.nombre,
                     nombreCreador = team.creador,
+                    pokemons = team.pokemons,
                     showButtonInfo = false,
                     onEditClick = { onEditClick(team.id) },
                     showEditButton = userId == team.creador,

@@ -267,6 +267,7 @@ fun TeamList(
                 nombreEquipo = team.nombre,
                 nombreCreador = team.creador,
                 pokemons = team.pokemons,
+                backgroundColor = team.backgroundColor,
                 showButtonInfo = true,
                 onDeleteClick = { onDeleteClick(team) },
                 onEditClick = { onEditClick(team.id) },
@@ -295,14 +296,15 @@ fun GetUserName(userId: String, firestoreService: FirestoreService) {
 }
 
 @Composable
-fun TeamComposition(pokemonIds: List<String>, modifier: Modifier = Modifier) {
-    val colores = arrayOf("f9e0e0", "ffece3", "feffda", "deffa0", "d0fff8")
-
-    val randomHex = colores.random()
-    val color = "FF$randomHex".toLong(16)
+fun TeamComposition(pokemonIds: List<String>, backgroundColor: String, modifier: Modifier = Modifier) {
+    val color = try {
+        Color("FF$backgroundColor".toLong(16))
+    } catch (e: Exception) {
+        Color(0xFFF2F2F2)
+    }
 
     BoxWithConstraints(
-        modifier = modifier.aspectRatio(640f / 480f).background(Color(color))
+        modifier = modifier.aspectRatio(640f / 480f).background(color)
     ) {
         val w = maxWidth
         val h = maxHeight
@@ -341,6 +343,7 @@ fun TeamCard(
     nombreEquipo: String, 
     nombreCreador: String, 
     pokemons: List<String> = emptyList(),
+    backgroundColor: String = "f2f2f2",
     showButtonInfo: Boolean, 
     onEditClick: () -> Unit = {}, 
     showEditButton: Boolean = false, 
@@ -371,6 +374,7 @@ fun TeamCard(
             } else {
                 TeamComposition(
                     pokemonIds = pokemons,
+                    backgroundColor = backgroundColor,
                     modifier = Modifier.fillMaxSize()
                 )
             }

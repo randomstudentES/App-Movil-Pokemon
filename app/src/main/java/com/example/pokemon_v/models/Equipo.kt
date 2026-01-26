@@ -6,5 +6,6 @@ data class Equipo(
     @DocumentId val id: String = "",
     val nombre: String = "",
     val creador: String = "",
-    val pokemons: List<String> = emptyList()
+    val pokemons: List<String> = emptyList(),
+    val backgroundColor: String = "f2f2f2"
 )

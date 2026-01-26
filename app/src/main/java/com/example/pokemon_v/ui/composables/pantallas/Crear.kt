@@ -2,17 +2,23 @@
 package com.example.pokemon_v.ui.composables.pantallas
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -37,8 +43,12 @@ fun CrearScreen(
     var selectedPokemons by rememberSaveable {
         mutableStateOf(listOf<String?>(null, null, null, null, null, null))
     }
+    var selectedColor by rememberSaveable { mutableStateOf("f2f2f2") }
     
     var showExitConfirmation by remember { mutableStateOf(false) }
+    var colorDropdownExpanded by remember { mutableStateOf(false) }
+
+    val colores = arrayOf("f9e0e0", "ffece3", "feffda", "deffa0", "d0fff8")
 
     val context = LocalContext.current
     val pokemonData = remember { readPokemonFromCsv(context) }
@@ -50,6 +60,7 @@ fun CrearScreen(
             val team = teams.find { it.id == teamId }
             if (team != null) {
                 teamName = team.nombre
+                selectedColor = team.backgroundColor
                 val pokemons = ArrayList<String?>(team.pokemons)
                 while (pokemons.size < 6) {
                     pokemons.add(null)
@@ -144,6 +155,8 @@ fun CrearScreen(
                 singleLine = true
             )
 
+            Text("Pokémon del equipo", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Start))
+
             selectedPokemons.forEachIndexed { index, pokemonId ->
                 Button(
                     onClick = { onAddPokemonClick(index) },
@@ -177,6 +190,67 @@ fun CrearScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Background Color Selector
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text("Color de fondo", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Box {
+                    OutlinedCard(
+                        onClick = { colorDropdownExpanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(Color("FF$selectedColor".toLong(16)))
+                                    .border(1.dp, Color.Gray, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(text = "#$selectedColor", modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = colorDropdownExpanded,
+                        onDismissRequest = { colorDropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        colores.forEach { colorHex ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .background(Color("FF$colorHex".toLong(16)))
+                                                .border(1.dp, Color.Gray, CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(text = "#$colorHex")
+                                    }
+                                },
+                                onClick = {
+                                    selectedColor = colorHex
+                                    colorDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
@@ -185,7 +259,8 @@ fun CrearScreen(
                         id = teamId ?: "",
                         nombre = teamName,
                         creador = userId, 
-                        pokemons = selectedPokemons.filterNotNull()
+                        pokemons = selectedPokemons.filterNotNull(),
+                        backgroundColor = selectedColor
                     )
                     if (teamId == null) {
                         viewModel.createTeam(userId, team)

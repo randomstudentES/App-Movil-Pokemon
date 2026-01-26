@@ -84,6 +84,7 @@ fun InfoEquipoScreen(
                     nombreEquipo = team.nombre,
                     nombreCreador = team.creador,
                     pokemons = team.pokemons,
+                    backgroundColor = team.backgroundColor, // <--- ESTO FALTABA
                     showButtonInfo = false,
                     onEditClick = { onEditClick(team.id) },
                     showEditButton = userId == team.creador,

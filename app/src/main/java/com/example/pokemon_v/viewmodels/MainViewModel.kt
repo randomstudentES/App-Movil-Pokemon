@@ -61,9 +61,9 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
     fun updateUserDescription(description: String) {
         viewModelScope.launch {
             _currentUser.value?.let {
-                val updatedUser = it.copy(description = description)
-                firestoreService.updateUser(updatedUser)
-                _currentUser.value = updatedUser
+                firestoreService.updateUserDescription(it.uid, description)
+                // Actualizamos el estado local también
+                _currentUser.value = it.copy(description = description)
             }
         }
     }

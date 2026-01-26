@@ -70,9 +70,21 @@ class FirestoreService {
     suspend fun updateUser(user: Usuario) {
         if (user.uid.isNotEmpty()) {
             try {
+                // Usamos update para evitar sobrescribir todo el objeto si solo queremos actualizar campos básicos
+                // Pero como este método recibe el objeto completo, si se quiere ser precavido es mejor usar updates específicos
                 usuariosCollection.document(user.uid).set(user).await()
             } catch (e: Exception) {
                 Log.e("FirestoreService", "Error updating user", e)
+            }
+        }
+    }
+
+    suspend fun updateUserDescription(uid: String, description: String) {
+        if (uid.isNotEmpty()) {
+            try {
+                usuariosCollection.document(uid).update("description", description).await()
+            } catch (e: Exception) {
+                Log.e("FirestoreService", "Error updating description", e)
             }
         }
     }

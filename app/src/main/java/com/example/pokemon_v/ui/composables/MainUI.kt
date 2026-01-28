@@ -1,12 +1,15 @@
 
 package com.example.pokemon_v.ui.composables
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -21,7 +24,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -36,8 +38,9 @@ import com.example.pokemon_v.ui.composables.pantallas.*
 import com.example.pokemon_v.viewmodels.MainViewModel
 import com.example.pokemon_v.viewmodels.MainViewModelFactory
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Preview(showBackground = true)
 @Composable
 fun NavMenuScreen() {
@@ -45,15 +48,17 @@ fun NavMenuScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Instantiate ViewModel
     val firestoreService = remember { FirestoreService() }
     val viewModel: MainViewModel = viewModel(factory = MainViewModelFactory(firestoreService))
     val currentUser by viewModel.currentUser.collectAsState()
 
+    val mainScreens = listOf("perfil", "buscar", "para_ti")
+    val coroutineScope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { mainScreens.size })
+
     val fullScreens = listOf("crear", "info_equipo", "lista_pokemon/{index}")
     val showScaffold = currentRoute != null && !fullScreens.any { currentRoute.startsWith(it.split("/")[0]) }
 
-    // --- Delete Confirmation Dialog State ---
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var teamToDelete by remember { mutableStateOf<Equipo?>(null) }
     var teamNameToDelete by remember { mutableStateOf("") }
@@ -107,7 +112,17 @@ fun NavMenuScreen() {
     Scaffold(
         bottomBar = {
             if (showScaffold) {
-                MenuInferior(navController, currentRoute, viewModel)
+                val currentPagerRoute = mainScreens[pagerState.currentPage]
+                MenuInferior(
+                    navController = navController,
+                    currentRoute = currentPagerRoute,
+                    viewModel = viewModel,
+                    onNavigateToPage = { index ->
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    }
+                )
             }
         },
         containerColor = Color.Transparent
@@ -116,50 +131,57 @@ fun NavMenuScreen() {
 
         NavHost(
             navController = navController,
-            startDestination = "perfil",
+            startDestination = "main",
             modifier = modifier
         ) {
-            composable("perfil") { 
-                PerfilScreen(
-                    viewModel = viewModel,
-                    onCrearClick = { navController.navigate("crear") },
-                    onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
-                    onEditClick = { teamId -> navController.navigate("crear?teamId=$teamId") },
-                    onDeleteClick = onDeleteRequest
-                ) 
-            }
-            composable("buscar") { 
-                 BuscarScreen(
-                    viewModel = viewModel,
-                    onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
-                    onProfileClick = { navController.navigate("perfil") }
-                ) 
-            }
-            composable("para_ti") { 
-                 ParaTiScreen(
-                    viewModel = viewModel,
-                    onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
-                    onProfileClick = { navController.navigate("perfil") }
-                ) 
+            composable("main") {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    when (mainScreens[page]) {
+                        "perfil" -> PerfilScreen(
+                            viewModel = viewModel,
+                            onCrearClick = { navController.navigate("crear") },
+                            onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
+                            onEditClick = { teamId -> navController.navigate("crear?teamId=$teamId") },
+                            onDeleteClick = onDeleteRequest
+                        )
+                        "buscar" -> BuscarScreen(
+                            viewModel = viewModel,
+                            onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
+                            onProfileClick = {
+                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                            }
+                        )
+                        "para_ti" -> ParaTiScreen(
+                            viewModel = viewModel,
+                            onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
+                            onProfileClick = {
+                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                            }
+                        )
+                    }
+                }
             }
             composable(
-    route = "crear?teamId={teamId}",
-    arguments = listOf(navArgument("teamId") { nullable = true })
-) {
-    if (currentUser != null) {
-        val teamId = it.arguments?.getString("teamId")
-        CrearScreen(
-            navController = navController,
-            viewModel = viewModel,
-            userId = currentUser!!.uid,
-            teamId = teamId,
-            onBack = { navController.popBackStack() },
-            onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
-        )
-    } else {
-        // This should not happen if navigation is handled correctly
-    }
-}
+                route = "crear?teamId={teamId}",
+                arguments = listOf(navArgument("teamId") { nullable = true })
+            ) {
+                if (currentUser != null) {
+                    val teamId = it.arguments?.getString("teamId")
+                    CrearScreen(
+                        navController = navController,
+                        viewModel = viewModel,
+                        userId = currentUser!!.uid,
+                        teamId = teamId,
+                        onBack = { navController.popBackStack() },
+                        onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
+                    )
+                } else {
+                    // Handle not logged in case
+                }
+            }
             composable(
                 route = "info_equipo/{teamId}",
                 arguments = listOf(navArgument("teamId") { type = NavType.StringType })
@@ -192,12 +214,12 @@ fun NavMenuScreen() {
     }
 }
 
-
 @Composable
 fun MenuInferior(
-    navController: NavHostController, 
-    currentRoute: String?, 
-    viewModel: MainViewModel
+    navController: NavHostController,
+    currentRoute: String?,
+    viewModel: MainViewModel,
+    onNavigateToPage: (Int) -> Unit
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
 
@@ -215,7 +237,7 @@ fun MenuInferior(
             Triple("crear", "Crear", Icons.Default.Add)
         )
 
-        items.forEach { (route, label, icon) ->
+        items.forEachIndexed { index, (route, label, icon) ->
             val isSelected = currentRoute == route
             val isCrear = route == "crear"
 
@@ -228,14 +250,10 @@ fun MenuInferior(
                         if (currentUser != null) {
                             navController.navigate("crear")
                         } else {
-                            navController.navigate("perfil")
+                            onNavigateToPage(0)
                         }
                     } else {
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        onNavigateToPage(index)
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
@@ -335,6 +353,38 @@ fun TeamComposition(pokemonIds: List<String>, backgroundColor: String, modifier:
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SlideShow(pokemonIds: List<String>, backgroundColor: String, modifier: Modifier = Modifier) {
+    val pagerState = rememberPagerState(pageCount = { pokemonIds.size + 1 })
+    val color = try {
+        Color("FF$backgroundColor".toLong(16))
+    } catch (e: Exception) {
+        Color(0xFFF2F2F2)
+    }
+
+    HorizontalPager(
+        state = pagerState,
+        modifier = modifier.background(color)
+    ) { page ->
+        if (page == 0) {
+            TeamComposition(
+                pokemonIds = pokemonIds,
+                backgroundColor = backgroundColor,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            val pokemonId = pokemonIds[page - 1]
+            AsyncImage(
+                model = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$pokemonId.png",
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        }
+    }
+}
+
 
 @Composable
 fun TeamCard(
@@ -372,7 +422,7 @@ fun TeamCard(
                     contentScale = ContentScale.Crop
                 )
             } else {
-                TeamComposition(
+                SlideShow(
                     pokemonIds = pokemons,
                     backgroundColor = backgroundColor,
                     modifier = Modifier.fillMaxSize()

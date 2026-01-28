@@ -54,6 +54,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.navigation.compose)
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("androidx.compose.foundation:foundation:1.7.0-beta01")
     
     // MySQL Connector
     implementation("mysql:mysql-connector-java:5.1.49")

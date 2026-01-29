@@ -267,8 +267,9 @@ fun CrearScreen(
                     } else {
                         viewModel.updateTeam(userId, team)
                     }
-                    navController.navigate("perfil") { 
-                        popUpTo("perfil") { inclusive = true }
+                    // CAMBIO: Navegar a "main" en lugar de "perfil"
+                    navController.navigate("main") { 
+                        popUpTo("main") { inclusive = true }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

@@ -28,6 +28,7 @@ import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.ui.composables.api.mappers.NameTranslator
 import com.example.pokemon_v.utils.readPokemonFromCsv
 import com.example.pokemon_v.viewmodels.MainViewModel
+import com.example.pokemon_v.utils.navigateSafe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +45,7 @@ fun CrearScreen(
         mutableStateOf(listOf<String?>(null, null, null, null, null, null))
     }
     var selectedColor by rememberSaveable { mutableStateOf("f2f2f2") }
+    var isInitialized by rememberSaveable { mutableStateOf(false) }
     
     var showExitConfirmation by remember { mutableStateOf(false) }
     var colorDropdownExpanded by remember { mutableStateOf(false) }
@@ -56,7 +58,7 @@ fun CrearScreen(
     val teams by viewModel.teams.collectAsState()
 
     LaunchedEffect(teamId, teams) {
-        if (teamId != null) {
+        if (!isInitialized && teamId != null) {
             val team = teams.find { it.id == teamId }
             if (team != null) {
                 teamName = team.nombre
@@ -66,6 +68,7 @@ fun CrearScreen(
                     pokemons.add(null)
                 }
                 selectedPokemons = pokemons.toList()
+                isInitialized = true
             }
         }
     }
@@ -268,7 +271,7 @@ fun CrearScreen(
                         viewModel.updateTeam(userId, team)
                     }
                     // CAMBIO: Navegar a "main" en lugar de "perfil"
-                    navController.navigate("main") { 
+                    navController.navigateSafe("main") { 
                         popUpTo("main") { inclusive = true }
                     }
                 },

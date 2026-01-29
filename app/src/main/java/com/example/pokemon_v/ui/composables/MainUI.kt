@@ -37,6 +37,7 @@ import com.example.pokemon_v.services.FirestoreService
 import com.example.pokemon_v.ui.composables.pantallas.*
 import com.example.pokemon_v.viewmodels.MainViewModel
 import com.example.pokemon_v.viewmodels.MainViewModelFactory
+import com.example.pokemon_v.utils.navigateSafe
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 
@@ -142,21 +143,21 @@ fun NavMenuScreen() {
                     when (mainScreens[page]) {
                         "perfil" -> PerfilScreen(
                             viewModel = viewModel,
-                            onCrearClick = { navController.navigate("crear") },
-                            onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
-                            onEditClick = { teamId -> navController.navigate("crear?teamId=$teamId") },
+                            onCrearClick = { navController.navigateSafe("crear") },
+                            onInfoClick = { teamId -> navController.navigateSafe("info_equipo/$teamId") },
+                            onEditClick = { teamId -> navController.navigateSafe("crear?teamId=$teamId") },
                             onDeleteClick = onDeleteRequest
                         )
                         "buscar" -> BuscarScreen(
                             viewModel = viewModel,
-                            onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
+                            onInfoClick = { teamId -> navController.navigateSafe("info_equipo/$teamId") },
                             onProfileClick = {
                                 coroutineScope.launch { pagerState.animateScrollToPage(0) }
                             }
                         )
                         "para_ti" -> ParaTiScreen(
                             viewModel = viewModel,
-                            onInfoClick = { teamId -> navController.navigate("info_equipo/$teamId") },
+                            onInfoClick = { teamId -> navController.navigateSafe("info_equipo/$teamId") },
                             onProfileClick = {
                                 coroutineScope.launch { pagerState.animateScrollToPage(0) }
                             }
@@ -176,7 +177,7 @@ fun NavMenuScreen() {
                         userId = currentUser!!.uid,
                         teamId = teamId,
                         onBack = { navController.popBackStack() },
-                        onAddPokemonClick = { index -> navController.navigate("lista_pokemon/$index") }
+                        onAddPokemonClick = { index -> navController.navigateSafe("lista_pokemon/$index") }
                     )
                 } else {
                     // Handle not logged in case
@@ -192,7 +193,7 @@ fun NavMenuScreen() {
                     viewModel = viewModel,
                     userId = currentUser?.uid ?: "",
                     onBack = { navController.popBackStack() },
-                    onEditClick = { teamId -> navController.navigate("crear?teamId=$teamId") },
+                    onEditClick = { teamId -> navController.navigateSafe("crear?teamId=$teamId") },
                     onDeleteClick = onDeleteRequest
                 )
             }
@@ -248,7 +249,7 @@ fun MenuInferior(
                 onClick = {
                     if (route == "crear") {
                         if (currentUser != null) {
-                            navController.navigate("crear")
+                            navController.navigateSafe("crear")
                         } else {
                             onNavigateToPage(0)
                         }

@@ -2,10 +2,14 @@
 package com.example.pokemon_v.ui.composables.pantallas
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -20,15 +24,48 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import com.example.pokemon_v.R
 import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.ui.composables.api.mappers.NameTranslator
 import com.example.pokemon_v.utils.readPokemonFromCsv
 import com.example.pokemon_v.viewmodels.MainViewModel
 import com.example.pokemon_v.utils.navigateSafe
+
+@Composable
+private fun BackgroundPreview(background: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
+    val color = try {
+        Color("FF$background".toLong(16))
+    } catch (e: Exception) {
+        null
+    }
+
+    if (color != null) {
+        Box(modifier = modifier.background(color))
+    } else {
+        val drawableId = remember(background) {
+            try {
+                val id = context.resources.getIdentifier(background, "drawable", context.packageName)
+                if (id == 0) R.drawable.placeholder else id
+            } catch (e: Exception) {
+                R.drawable.placeholder
+            }
+        }
+        Image(
+            painter = painterResource(id = drawableId),
+            contentDescription = "Background",
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,25 +81,43 @@ fun CrearScreen(
     var selectedPokemons by rememberSaveable {
         mutableStateOf(listOf<String?>(null, null, null, null, null, null))
     }
-    var selectedColor by rememberSaveable { mutableStateOf("f2f2f2") }
+    var selectedBackground by rememberSaveable { mutableStateOf("default_background") }
     var isInitialized by rememberSaveable { mutableStateOf(false) }
     
     var showExitConfirmation by remember { mutableStateOf(false) }
-    var colorDropdownExpanded by remember { mutableStateOf(false) }
-
-    val colores = arrayOf("f9e0e0", "ffece3", "feffda", "deffa0", "d0fff8")
+    var backgroundSelectorExpanded by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val pokemonData = remember { readPokemonFromCsv(context) }
-
     val teams by viewModel.teams.collectAsState()
+
+    val backgrounds = remember {
+        listOf(
+            "bn_n", "dp_trio", "xy_mega", "xy_trio", "bn_munna", "dp_patio", "plt_trio", "rfvh_mar", "rfvh_rio",
+            "rze_azul", "bn_sabios", "bn_zekrom", "hgss_alma", "hgss_trio", "roza_aqua", "roza_mapa", "roza_trio",
+            "dp_espacio", "dp_pikachu", "dp_torchic", "hgss_pichu", "plt_raichu", "rfvh_cielo", "rfvh_cueva",
+            "rfvh_nieve", "rfvh_playa", "roza_magma", "xy_xerneas", "xy_yveltal", "bn_reshiram", "hgss_castor",
+            "hgss_kimono", "hgss_rocket", "plt_leyenda", "rfvh_bosque", "rfvh_ciudad", "rfvh_sabana", "rfvh_volcan",
+            "xy_conexion", "dp_nostalgia", "hgss_corazon", "plt_concurso", "plt_croagunk", "rfvh_montana",
+            "xy_pastelito", "plt_nostalgia", "rfvh_desierto", "roza_concurso", "xy_team_flare", "dp_legendarios",
+            "plt_distorsion", "bn_musical_pkmn", "hgss_pokeathlon", "bn_equipo_plasma", "bn_metro_batalla",
+            "bn_blanco_y_negro", "dp_equipo_galaxia", "rze_copo_de_nieve", "plt_equipo_galaxia",
+            "roza_mega_rayquaza", "bn_zorua_y_zororark", "xy_superentrenamiento", "roza_kyogre_primigenio",
+            "roza_groudon_primigenio", "hgss_parque_nacional_dia", "hgss_parque_nacional_noche"
+        )
+    }
+
+    fun getDrawableId(name: String): Int {
+        val id = context.resources.getIdentifier(name, "drawable", context.packageName)
+        return if (id == 0) R.drawable.placeholder else id
+    }
 
     LaunchedEffect(teamId, teams) {
         if (!isInitialized && teamId != null) {
             val team = teams.find { it.id == teamId }
             if (team != null) {
                 teamName = team.nombre
-                selectedColor = team.backgroundColor
+                selectedBackground = team.backgroundColor
                 val pokemons = ArrayList<String?>(team.pokemons)
                 while (pokemons.size < 6) {
                     pokemons.add(null)
@@ -195,14 +250,14 @@ fun CrearScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Background Color Selector
+            // Background Selector
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text("Color de fondo", style = MaterialTheme.typography.titleMedium)
+                Text("Fondo del equipo", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Box {
                     OutlinedCard(
-                        onClick = { colorDropdownExpanded = true },
+                        onClick = { backgroundSelectorExpanded = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -211,45 +266,51 @@ fun CrearScreen(
                                 .fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
+                            BackgroundPreview(
+                                background = selectedBackground,
                                 modifier = Modifier
-                                    .size(24.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(Color("FF$selectedColor".toLong(16)))
-                                    .border(1.dp, Color.Gray, CircleShape)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(text = "#$selectedColor", modifier = Modifier.weight(1f))
+                            Text(text = selectedBackground, modifier = Modifier.weight(1f))
                             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                         }
                     }
 
-                    DropdownMenu(
-                        expanded = colorDropdownExpanded,
-                        onDismissRequest = { colorDropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(0.9f)
-                    ) {
-                        colores.forEach { colorHex ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
+                    if (backgroundSelectorExpanded) {
+                        AlertDialog(
+                            onDismissRequest = { backgroundSelectorExpanded = false },
+                            title = { Text("Seleccionar Fondo") },
+                            text = {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Adaptive(minSize = 100.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(backgrounds) { bgName ->
+                                        Image(
+                                            painter = painterResource(id = getDrawableId(bgName)),
+                                            contentDescription = bgName,
                                             modifier = Modifier
-                                                .size(24.dp)
-                                                .clip(CircleShape)
-                                                .background(Color("FF$colorHex".toLong(16)))
-                                                .border(1.dp, Color.Gray, CircleShape)
+                                                .size(100.dp)
+                                                .clip(MaterialTheme.shapes.medium)
+                                                .clickable {
+                                                    selectedBackground = bgName
+                                                    backgroundSelectorExpanded = false
+                                                },
+                                            contentScale = ContentScale.Crop
                                         )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(text = "#$colorHex")
                                     }
-                                },
-                                onClick = {
-                                    selectedColor = colorHex
-                                    colorDropdownExpanded = false
                                 }
-                            )
-                        }
+                            },
+                            confirmButton = {                            
+                                TextButton(onClick = { backgroundSelectorExpanded = false }) {
+                                    Text("Cerrar")
+                                }
+                             }
+                        )
                     }
                 }
             }
@@ -263,14 +324,13 @@ fun CrearScreen(
                         nombre = teamName,
                         creador = userId, 
                         pokemons = selectedPokemons.filterNotNull(),
-                        backgroundColor = selectedColor
+                        backgroundColor = selectedBackground
                     )
                     if (teamId == null) {
                         viewModel.createTeam(userId, team)
                     } else {
                         viewModel.updateTeam(userId, team)
                     }
-                    // CAMBIO: Navegar a "main" en lugar de "perfil"
                     navController.navigateSafe("main") { 
                         popUpTo("main") { inclusive = true }
                     }

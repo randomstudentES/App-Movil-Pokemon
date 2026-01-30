@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -336,15 +337,42 @@ fun GetUserName(userId: String, firestoreService: FirestoreService) {
 }
 
 @Composable
-fun TeamComposition(pokemonIds: List<String>, backgroundColor: String, modifier: Modifier = Modifier) {
+fun CardBackground(background: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
+    // Intenta interpretar el string como un color hexadecimal
     val color = try {
-        Color("FF$backgroundColor".toLong(16))
+        Color("FF$background".toLong(16))
     } catch (e: Exception) {
-        Color(0xFFF2F2F2)
+        null
     }
 
+    if (color != null) {
+        // Si es un color, usa un Box con ese color de fondo
+        Box(modifier = modifier.background(color))
+    } else {
+        // Si no es un color, intenta cargarlo como un recurso drawable
+        val drawableId = remember(background) {
+            try {
+                val id = context.resources.getIdentifier(background, "drawable", context.packageName)
+                if (id == 0) R.drawable.placeholder else id
+            } catch (e: Exception) {
+                R.drawable.placeholder
+            }
+        }
+        Image(
+            painter = painterResource(id = drawableId),
+            contentDescription = "Background",
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    }
+}
+
+@Composable
+fun TeamComposition(pokemonIds: List<String>, modifier: Modifier = Modifier) {
     BoxWithConstraints(
-        modifier = modifier.aspectRatio(640f / 480f).background(color)
+        modifier = modifier.aspectRatio(640f / 480f)
     ) {
         val w = maxWidth
         val h = maxHeight
@@ -377,36 +405,38 @@ fun TeamComposition(pokemonIds: List<String>, backgroundColor: String, modifier:
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SlideShow(pokemonIds: List<String>, backgroundColor: String, modifier: Modifier = Modifier) {
+fun SlideShow(pokemonIds: List<String>, backgroundName: String, modifier: Modifier = Modifier) {
     val pagerState = rememberPagerState(pageCount = { pokemonIds.size + 1 })
-    val color = try {
-        Color("FF$backgroundColor".toLong(16))
-    } catch (e: Exception) {
-        Color(0xFFF2F2F2)
-    }
 
-    HorizontalPager(
-        state = pagerState,
-        modifier = modifier.background(color)
-    ) { page ->
-        if (page == 0) {
-            TeamComposition(
-                pokemonIds = pokemonIds,
-                backgroundColor = backgroundColor,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            val pokemonId = pokemonIds[page - 1]
-            AsyncImage(
-                model = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$pokemonId.png",
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+    Box(modifier = modifier) {
+        // Fondo unificado que maneja tanto colores como drawables
+        CardBackground(
+            background = backgroundName,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            if (page == 0) {
+                // TeamComposition ya no necesita el fondo
+                TeamComposition(
+                    pokemonIds = pokemonIds,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                val pokemonId = pokemonIds[page - 1]
+                AsyncImage(
+                    model = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$pokemonId.png",
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
     }
 }
-
 
 @Composable
 fun TeamCard(
@@ -415,7 +445,7 @@ fun TeamCard(
     nombreEquipo: String, 
     nombreCreador: String, 
     pokemons: List<String> = emptyList(),
-    backgroundColor: String = "f2f2f2",
+    backgroundColor: String = "default_background",
     showButtonInfo: Boolean, 
     onEditClick: () -> Unit = {}, 
     showEditButton: Boolean = false, 
@@ -446,7 +476,7 @@ fun TeamCard(
             } else {
                 SlideShow(
                     pokemonIds = pokemons,
-                    backgroundColor = backgroundColor,
+                    backgroundName = backgroundColor, 
                     modifier = Modifier.fillMaxSize()
                 )
             }

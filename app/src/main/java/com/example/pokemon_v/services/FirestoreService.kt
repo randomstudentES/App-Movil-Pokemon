@@ -3,11 +3,14 @@ package com.example.pokemon_v.services
 
 import android.util.Log
 import com.example.pokemon_v.models.Equipo
+import com.example.pokemon_v.models.LogEntry
 import com.example.pokemon_v.models.Usuario
 import com.example.pokemon_v.utils.SecurityUtils
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
@@ -18,6 +21,7 @@ class FirestoreService {
     private val db: FirebaseFirestore = Firebase.firestore
     private val usuariosCollection = db.collection("usuarios")
     private val equiposCollection = db.collection("equipos")
+    private val logsCollection = db.collection("logs")
 
     // Auth operations
     suspend fun login(name: String, password: String): Usuario? {
@@ -160,6 +164,25 @@ class FirestoreService {
             usuariosCollection.document(userId).update("teamIds", FieldValue.arrayRemove(teamId)).await()
         } catch (e: Exception) {
             Log.e("FirestoreService", "Error deleting team", e)
+        }
+    }
+
+    // Logs operations
+    suspend fun getLogs(lastSnapshot: QuerySnapshot? = null): QuerySnapshot? {
+        return try {
+            var query = logsCollection
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(50)
+            
+            if (lastSnapshot != null && !lastSnapshot.isEmpty) {
+                val lastVisible = lastSnapshot.documents[lastSnapshot.size() - 1]
+                query = query.startAfter(lastVisible)
+            }
+            
+            query.get().await()
+        } catch (e: Exception) {
+            Log.e("FirestoreService", "Error getting logs", e)
+            null
         }
     }
 }

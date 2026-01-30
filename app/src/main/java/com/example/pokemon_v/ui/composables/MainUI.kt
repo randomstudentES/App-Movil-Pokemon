@@ -53,7 +53,18 @@ fun NavMenuScreen() {
     val viewModel: MainViewModel = viewModel(factory = MainViewModelFactory(firestoreService))
     val currentUser by viewModel.currentUser.collectAsState()
 
-    val mainScreens = listOf("perfil", "buscar", "para_ti")
+    // Determinamos si el usuario es administrador
+    val isAdmin = currentUser?.rol == "admin"
+    
+    // Lista de pantallas del Pager dinámica basada en el rol
+    val mainScreens = remember(isAdmin) {
+        if (isAdmin) {
+            listOf("perfil", "buscar", "para_ti", "logs")
+        } else {
+            listOf("perfil", "buscar", "para_ti")
+        }
+    }
+
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { mainScreens.size })
 
@@ -113,7 +124,7 @@ fun NavMenuScreen() {
     Scaffold(
         bottomBar = {
             if (showScaffold) {
-                val currentPagerRoute = mainScreens[pagerState.currentPage]
+                val currentPagerRoute = mainScreens.getOrNull(pagerState.currentPage)
                 MenuInferior(
                     navController = navController,
                     currentRoute = currentPagerRoute,
@@ -161,6 +172,9 @@ fun NavMenuScreen() {
                             onProfileClick = {
                                 coroutineScope.launch { pagerState.animateScrollToPage(0) }
                             }
+                        )
+                        "logs" -> LogsScreen(
+                            viewModel = viewModel
                         )
                     }
                 }
@@ -223,6 +237,7 @@ fun MenuInferior(
     onNavigateToPage: (Int) -> Unit
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
+    val isAdmin = currentUser?.rol == "admin"
 
     NavigationBar(
         modifier = Modifier
@@ -231,12 +246,18 @@ fun MenuInferior(
         containerColor = Color(0xFF1C1C1C),
         tonalElevation = 0.dp
     ) {
-        val items = listOf(
-            Triple("perfil", "Perfil", Icons.Default.Person),
-            Triple("buscar", "Buscar", Icons.Default.Search),
-            Triple("para_ti", "Para Ti", Icons.Default.Favorite),
-            Triple("crear", "Crear", Icons.Default.Add)
-        )
+        val items = remember(isAdmin) {
+            val baseItems = mutableListOf(
+                Triple("perfil", "Perfil", Icons.Default.Person),
+                Triple("buscar", "Buscar", Icons.Default.Search),
+                Triple("para_ti", "Para Ti", Icons.Default.Favorite)
+            )
+            if (isAdmin) {
+                baseItems.add(Triple("logs", "Logs", Icons.Default.History))
+            }
+            baseItems.add(Triple("crear", "Crear", Icons.Default.Add))
+            baseItems.toList()
+        }
 
         items.forEachIndexed { index, (route, label, icon) ->
             val isSelected = currentRoute == route

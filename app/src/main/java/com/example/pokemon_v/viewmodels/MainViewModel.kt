@@ -4,9 +4,11 @@ package com.example.pokemon_v.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pokemon_v.models.Equipo
+import com.example.pokemon_v.models.LogEntry
 import com.example.pokemon_v.models.Usuario
 import com.example.pokemon_v.services.FirestoreService
 import com.example.pokemon_v.utils.Logger
+import com.google.firebase.firestore.QuerySnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -24,6 +26,16 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
     
     private val _apiError = MutableStateFlow<String?>(null)
     val apiError: StateFlow<String?> = _apiError
+
+    // State for Logs
+    private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
+    val logs: StateFlow<List<LogEntry>> = _logs
+
+    private val _isLoadingLogs = MutableStateFlow(false)
+    val isLoadingLogs: StateFlow<Boolean> = _isLoadingLogs
+
+    private var lastLogsSnapshot: QuerySnapshot? = null
+    private var isLastLogsPage = false
 
     fun clearApiError() {
         _apiError.value = null
@@ -125,6 +137,31 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
                 Logger.log(it.uid, it.name, "Eliminación de equipo: $teamName")
             }
             loadTeams(userId) // Refresh user's teams
+        }
+    }
+
+    // Logs Functions
+    fun loadLogs(reset: Boolean = false) {
+        if (_isLoadingLogs.value || (isLastLogsPage && !reset)) return
+
+        viewModelScope.launch {
+            _isLoadingLogs.value = true
+            if (reset) {
+                lastLogsSnapshot = null
+                _logs.value = emptyList()
+                isLastLogsPage = false
+            }
+
+            val snapshot = firestoreService.getLogs(lastLogsSnapshot)
+            if (snapshot != null) {
+                val newLogs = snapshot.toObjects(LogEntry::class.java)
+                _logs.value = _logs.value + newLogs
+                lastLogsSnapshot = snapshot
+                if (newLogs.size < 50) {
+                    isLastLogsPage = true
+                }
+            }
+            _isLoadingLogs.value = false
         }
     }
 }

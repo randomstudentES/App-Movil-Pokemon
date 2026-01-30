@@ -8,6 +8,7 @@ data class Usuario(
     val description: String? = null,
     val password: String = "",
     val salt: String = "",
+    val rol: String = "usuario",
     val created_at: Timestamp = Timestamp.now(),
     val teamIds: List<String> = emptyList()
 )

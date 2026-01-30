@@ -56,10 +56,12 @@ class FirestoreService {
                 val salt = SecurityUtils.generateSalt()
                 val hashedPassword = SecurityUtils.hashPassword(user.password, salt)
                 
+                // CAMBIO: Aseguramos que el rol sea "usuario" por defecto al registrarse
                 val newUser = user.copy(
                     uid = userId, 
                     password = hashedPassword,
-                    salt = salt
+                    salt = salt,
+                    rol = "usuario"
                 )
                 
                 usuariosCollection.document(userId).set(newUser).await()

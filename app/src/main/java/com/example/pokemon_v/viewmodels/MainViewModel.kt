@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.models.Usuario
 import com.example.pokemon_v.services.FirestoreService
+import com.example.pokemon_v.utils.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -35,6 +36,7 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
             val user = firestoreService.login(name, password)
             _currentUser.value = user
             if (user != null) {
+                Logger.log(user.uid, user.name, "Inicio de sesión")
                 loadTeams(user.uid)
             } else {
                 _apiError.value = "Nombre de usuario o contraseña incorrectos."
@@ -47,13 +49,18 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
             _apiError.value = null
             val newUser = firestoreService.register(user)
             _currentUser.value = newUser
-            if (newUser == null) {
+            if (newUser != null) {
+                Logger.log(newUser.uid, newUser.name, "Registro de usuario e inicio de sesión")
+            } else {
                 _apiError.value = "El nombre de usuario ya existe."
             }
         }
     }
 
     fun logout() {
+        _currentUser.value?.let { 
+            Logger.log(it.uid, it.name, "Cierre de sesión")
+        }
         _currentUser.value = null
         _teams.value = emptyList()
     }
@@ -62,6 +69,7 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
         viewModelScope.launch {
             _currentUser.value?.let {
                 firestoreService.updateUserDescription(it.uid, description)
+                Logger.log(it.uid, it.name, "Actualización de descripción de perfil")
                 // Actualizamos el estado local también
                 _currentUser.value = it.copy(description = description)
             }
@@ -72,6 +80,9 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
     fun createTeam(userId: String, team: Equipo) {
         viewModelScope.launch {
             firestoreService.createTeam(userId, team)
+            _currentUser.value?.let {
+                Logger.log(it.uid, it.name, "Creación de equipo: ${team.nombre}")
+            }
             loadTeams(userId) // Refresh user's teams
         }
     }
@@ -99,13 +110,20 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
     fun updateTeam(userId: String, team: Equipo) {
         viewModelScope.launch {
             firestoreService.updateTeam(userId, team)
+            _currentUser.value?.let {
+                Logger.log(it.uid, it.name, "Edición de equipo: ${team.nombre}")
+            }
             loadTeams(userId)
         }
     }
 
     fun deleteTeam(userId: String, teamId: String) {
         viewModelScope.launch {
+            val teamName = _teams.value.find { it.id == teamId }?.nombre ?: "ID: $teamId"
             firestoreService.deleteTeam(userId, teamId)
+            _currentUser.value?.let {
+                Logger.log(it.uid, it.name, "Eliminación de equipo: $teamName")
+            }
             loadTeams(userId) // Refresh user's teams
         }
     }

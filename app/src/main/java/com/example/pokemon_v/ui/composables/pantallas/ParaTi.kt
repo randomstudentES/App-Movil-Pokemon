@@ -23,6 +23,8 @@ fun ParaTiScreen(
     onProfileClick: () -> Unit
 ) {
     val allTeams by viewModel.allTeams.collectAsState()
+    val favoriteTeamIds by viewModel.favoriteTeamIds.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadAllTeams()
@@ -34,6 +36,14 @@ fun ParaTiScreen(
         ) {
             TeamList(
                 teams = allTeams,
+                favoriteTeamIds = favoriteTeamIds,
+                onFavoriteToggle = { teamId -> 
+                    if (currentUser == null) {
+                        onProfileClick()
+                    } else {
+                        viewModel.toggleFavorite(teamId)
+                    }
+                },
                 onInfoClick = onInfoClick,
                 onProfileClick = onProfileClick,
                 onDeleteClick = {},
@@ -46,13 +56,11 @@ fun ParaTiScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp), // Añadir padding opcional
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Text("No hay ningun equipo, espera a ver si crea alguien alguno :p")
         }
     }
-
-
 }

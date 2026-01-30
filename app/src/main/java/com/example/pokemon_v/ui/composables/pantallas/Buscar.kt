@@ -23,6 +23,8 @@ fun BuscarScreen(
 ) {
     var searchText by remember { mutableStateOf("") }
     val allTeams by viewModel.allTeams.collectAsState()
+    val favoriteTeamIds by viewModel.favoriteTeamIds.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadAllTeams()
@@ -51,6 +53,14 @@ fun BuscarScreen(
 
         TeamList(
             teams = allTeams.filter { it.nombre.contains(searchText, ignoreCase = true) },
+            favoriteTeamIds = favoriteTeamIds,
+            onFavoriteToggle = { teamId -> 
+                if (currentUser == null) {
+                    onProfileClick()
+                } else {
+                    viewModel.toggleFavorite(teamId) 
+                }
+            },
             onInfoClick = onInfoClick,
             onProfileClick = onProfileClick,
             onDeleteClick = {},

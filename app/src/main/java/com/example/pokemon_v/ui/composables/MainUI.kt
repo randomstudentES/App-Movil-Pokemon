@@ -39,6 +39,7 @@ import com.example.pokemon_v.viewmodels.MainViewModel
 import com.example.pokemon_v.viewmodels.MainViewModelFactory
 import com.example.pokemon_v.utils.navigateSafe
 import coil.compose.AsyncImage
+import com.example.pokemon_v.data.local.AppDatabase
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -48,9 +49,18 @@ fun NavMenuScreen() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val context = androidx.compose.ui.platform.LocalContext.current // Needed for Room
+
+    // 1. Initialize your Room Database and get the DAO
+    val database = remember { AppDatabase.getDatabase(context) }
+    val favoriteDao = remember { database.favoriteDao() }
 
     val firestoreService = remember { FirestoreService() }
-    val viewModel: MainViewModel = viewModel(factory = MainViewModelFactory(firestoreService))
+
+    // 2. Pass BOTH dependencies to the Factory
+    val viewModel: MainViewModel = viewModel(
+        factory = MainViewModelFactory(firestoreService, favoriteDao)
+    )
     val currentUser by viewModel.currentUser.collectAsState()
 
     // Determinamos si el usuario es administrador
@@ -289,6 +299,8 @@ fun MenuInferior(
 @Composable
 fun TeamList(
     teams: List<Equipo>, 
+    favoriteTeamIds: List<String>,
+    onFavoriteToggle: (String) -> Unit,
     onInfoClick: (String) -> Unit,
     onProfileClick: () -> Unit,
     onDeleteClick: (Equipo) -> Unit, 
@@ -312,7 +324,9 @@ fun TeamList(
                 onDeleteClick = { onDeleteClick(team) },
                 onEditClick = { onEditClick(team.id) },
                 showEditButton = showEditButton,
-                showDeleteButton = showDeleteButton
+                showDeleteButton = showDeleteButton,
+                isFavorite = favoriteTeamIds.contains(team.id),
+                onFavoriteClick = { onFavoriteToggle(team.id) }
             )
         }
     }
@@ -420,9 +434,10 @@ fun TeamCard(
     onEditClick: () -> Unit = {}, 
     showEditButton: Boolean = false, 
     onDeleteClick: () -> Unit = {},
-    showDeleteButton: Boolean = false
+    showDeleteButton: Boolean = false,
+    isFavorite: Boolean = false,
+    onFavoriteClick: () -> Unit = {}
 ) {
-    var isFavorite by remember { mutableStateOf(false) }
     val firestoreService = remember { FirestoreService() }
 
     Column(
@@ -452,7 +467,7 @@ fun TeamCard(
             }
 
             IconButton(
-                onClick = { isFavorite = !isFavorite },
+                onClick = onFavoriteClick,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(12.dp)

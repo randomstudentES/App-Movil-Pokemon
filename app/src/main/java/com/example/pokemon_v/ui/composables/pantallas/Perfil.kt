@@ -21,7 +21,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lint.kotlin.metadata.Visibility
 import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.models.Usuario
 import com.example.pokemon_v.ui.composables.TeamList
@@ -61,6 +60,8 @@ fun ProfileView(
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
     val teams by viewModel.teams.collectAsState()
+    val favoriteTeamIds by viewModel.favoriteTeamIds.collectAsState()
+    
     var showMenu by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     var isEditingDescription by remember { mutableStateOf(false) }
@@ -194,6 +195,8 @@ fun ProfileView(
 
             TeamList(
                 teams = teams,
+                favoriteTeamIds = favoriteTeamIds,
+                onFavoriteToggle = { teamId -> viewModel.toggleFavorite(teamId) },
                 onInfoClick = onInfoClick,
                 onProfileClick = {},
                 onDeleteClick = onDeleteClick,

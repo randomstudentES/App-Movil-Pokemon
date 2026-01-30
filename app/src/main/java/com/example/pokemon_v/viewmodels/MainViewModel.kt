@@ -3,17 +3,21 @@ package com.example.pokemon_v.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pokemon_v.data.local.dao.FavoriteDao
+import com.example.pokemon_v.data.local.entities.FavoriteTeam
 import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.models.LogEntry
 import com.example.pokemon_v.models.Usuario
 import com.example.pokemon_v.services.FirestoreService
 import com.example.pokemon_v.utils.Logger
 import com.google.firebase.firestore.QuerySnapshot
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-class MainViewModel(private val firestoreService: FirestoreService) : ViewModel() {
+class MainViewModel(
+    private val firestoreService: FirestoreService,
+    private val favoriteDao: FavoriteDao
+) : ViewModel() {
 
     private val _currentUser = MutableStateFlow<Usuario?>(null)
     val currentUser: StateFlow<Usuario?> = _currentUser
@@ -36,6 +40,14 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
 
     private var lastLogsSnapshot: QuerySnapshot? = null
     private var isLastLogsPage = false
+
+    // Favorites from Room
+    val favoriteTeamIds: StateFlow<List<String>> = _currentUser
+        .flatMapLatest { user ->
+            if (user == null) flowOf(emptyList())
+            else favoriteDao.getFavoriteTeamIds(user.uid)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun clearApiError() {
         _apiError.value = null
@@ -162,6 +174,19 @@ class MainViewModel(private val firestoreService: FirestoreService) : ViewModel(
                 }
             }
             _isLoadingLogs.value = false
+        }
+    }
+
+    // Favorite Functions
+    fun toggleFavorite(teamId: String) {
+        val userId = _currentUser.value?.uid ?: return
+        viewModelScope.launch {
+            val favorites = favoriteTeamIds.value
+            if (favorites.contains(teamId)) {
+                favoriteDao.removeFavorite(userId, teamId)
+            } else {
+                favoriteDao.insertFavorite(FavoriteTeam(userId, teamId))
+            }
         }
     }
 }

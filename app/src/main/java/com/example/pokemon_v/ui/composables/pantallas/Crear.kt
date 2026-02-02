@@ -32,6 +32,7 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.pokemon_v.R
 import com.example.pokemon_v.models.Equipo
+import com.example.pokemon_v.models.Usuario
 import com.example.pokemon_v.ui.composables.api.mappers.NameTranslator
 import com.example.pokemon_v.utils.readPokemonFromCsv
 import com.example.pokemon_v.viewmodels.MainViewModel
@@ -90,6 +91,18 @@ fun CrearScreen(
     val context = LocalContext.current
     val pokemonData = remember { readPokemonFromCsv(context) }
     val teams by viewModel.teams.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val allUsers by viewModel.allUsers.collectAsState()
+    val isAdmin = currentUser?.rol == "admin"
+
+    var selectedUser by remember { mutableStateOf<Usuario?>(null) }
+    var userSelectorExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(allUsers, currentUser) {
+        if (isAdmin && selectedUser == null) {
+            selectedUser = currentUser
+        }
+    }
 
     val backgrounds = remember {
         listOf(
@@ -205,6 +218,37 @@ fun CrearScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+
+            if (isAdmin) {
+                ExposedDropdownMenuBox(
+                    expanded = userSelectorExpanded,
+                    onExpandedChange = { userSelectorExpanded = !userSelectorExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedUser?.name ?: "",
+                        onValueChange = {},
+                        label = { Text("Usuario") },
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = userSelectorExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = userSelectorExpanded,
+                        onDismissRequest = { userSelectorExpanded = false }
+                    ) {
+                        allUsers.forEach { user ->
+                            DropdownMenuItem(
+                                text = { Text(user.name) },
+                                onClick = {
+                                    selectedUser = user
+                                    userSelectorExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             OutlinedTextField(
                 value = teamName,
                 onValueChange = { teamName = it },
@@ -319,17 +363,18 @@ fun CrearScreen(
 
             Button(
                 onClick = {
+                    val creatorId = if (isAdmin) selectedUser?.uid ?: userId else userId
                     val team = Equipo(
                         id = teamId ?: "",
                         nombre = teamName,
-                        creador = userId, 
+                        creador = creatorId, 
                         pokemons = selectedPokemons.filterNotNull(),
                         backgroundColor = selectedBackground
                     )
                     if (teamId == null) {
-                        viewModel.createTeam(userId, team)
+                        viewModel.createTeam(creatorId, team)
                     } else {
-                        viewModel.updateTeam(userId, team)
+                        viewModel.updateTeam(creatorId, team)
                     }
                     navController.navigateSafe("main") { 
                         popUpTo("main") { inclusive = true }

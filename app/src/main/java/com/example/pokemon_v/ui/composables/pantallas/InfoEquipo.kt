@@ -30,11 +30,15 @@ fun InfoEquipoScreen(
     userId: String,
     onBack: () -> Unit,
     onEditClick: (String) -> Unit,
-    onDeleteClick: (Equipo) -> Unit
+    onDeleteClick: (Equipo) -> Unit,
+    onProfileClick: () -> Unit
 ) {
     val userTeams by viewModel.teams.collectAsState()
     val allTeams by viewModel.allTeams.collectAsState()
     val team = userTeams.find { it.id == teamId } ?: allTeams.find { it.id == teamId }
+    val favoriteTeamIds by viewModel.favoriteTeamIds.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val isAdmin = currentUser?.rol == "admin"
 
     var pokemonDetails by remember { mutableStateOf<List<PokemonInfo>>(emptyList()) }
 
@@ -84,12 +88,20 @@ fun InfoEquipoScreen(
                     nombreEquipo = team.nombre,
                     nombreCreador = team.creador,
                     pokemons = team.pokemons,
-                    backgroundColor = team.backgroundColor, // <--- ESTO FALTABA
+                    backgroundColor = team.backgroundColor,
                     showButtonInfo = false,
                     onEditClick = { onEditClick(team.id) },
-                    showEditButton = userId == team.creador,
+                    showEditButton = userId == team.creador || isAdmin,
                     onDeleteClick = { onDeleteClick(team) },
-                    showDeleteButton = userId == team.creador
+                    showDeleteButton = userId == team.creador || isAdmin,
+                    isFavorite = favoriteTeamIds.contains(team.id),
+                    onFavoriteClick = {
+                        if (currentUser == null) {
+                            onProfileClick()
+                        } else {
+                            viewModel.toggleFavorite(team.id)
+                        }
+                    }
                 )
 
                 Text(

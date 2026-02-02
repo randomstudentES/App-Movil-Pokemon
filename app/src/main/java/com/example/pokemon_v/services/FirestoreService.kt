@@ -94,6 +94,15 @@ class FirestoreService {
         }
     }
 
+    suspend fun getAllUsers(): List<Usuario> {
+        return try {
+            usuariosCollection.get().await().toObjects(Usuario::class.java)
+        } catch (e: Exception) {
+            Log.e("FirestoreService", "Error getting all users", e)
+            emptyList()
+        }
+    }
+
     suspend fun updateUser(user: Usuario) {
         if (user.uid.isNotEmpty()) {
             try {

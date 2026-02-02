@@ -201,7 +201,7 @@ fun ProfileView(
                 onProfileClick = {},
                 onDeleteClick = onDeleteClick,
                 onEditClick = onEditClick,
-                showEditButton = false,
+                showEditButton = true,
                 showDeleteButton = true
             )
         }
@@ -257,7 +257,12 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
         Text(if (isLogin) "Iniciar Sesión" else "Registro", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre de usuario") })
+        OutlinedTextField(
+            value = name, 
+            onValueChange = { name = it.filter { char -> char.isLetterOrDigit() } }, 
+            label = { Text("Nombre de usuario") },
+            singleLine = true
+        )
         Spacer(modifier = Modifier.height(8.dp))
 
         val isPasswordError = !isLogin && password.isNotEmpty() && passwordError != null
@@ -276,6 +281,7 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             isError = isPasswordError,
+            singleLine = true,
             supportingText = {
                 if (isPasswordError) {
                     passwordError?.let { Text(it) }
@@ -302,6 +308,7 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
                 visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 isError = isConfirmPasswordError,
+                singleLine = true,
                 supportingText = {
                     if (isConfirmPasswordError) {
                         confirmPasswordError?.let { Text(it) }

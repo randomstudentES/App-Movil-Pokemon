@@ -70,9 +70,9 @@ fun NavMenuScreen() {
     // Lista de pantallas del Pager dinámica basada en el rol
     val mainScreens = remember(isAdmin) {
         if (isAdmin) {
-            listOf("perfil", "buscar", "para_ti", "logs")
+            listOf("perfil", "buscar", "para_ti", "favoritos", "logs")
         } else {
-            listOf("perfil", "buscar", "para_ti")
+            listOf("perfil", "buscar", "para_ti", "favoritos")
         }
     }
 
@@ -184,6 +184,13 @@ fun NavMenuScreen() {
                                 coroutineScope.launch { pagerState.animateScrollToPage(0) }
                             }
                         )
+                        "favoritos" -> FavoritosScreen(
+                            viewModel = viewModel,
+                            onInfoClick = { teamId -> navController.navigateSafe("info_equipo/$teamId") },
+                            onProfileClick = {
+                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                            }
+                        )
                         "logs" -> LogsScreen(
                             viewModel = viewModel
                         )
@@ -219,7 +226,10 @@ fun NavMenuScreen() {
                     userId = currentUser?.uid ?: "",
                     onBack = { navController.popBackStack() },
                     onEditClick = { teamId -> navController.navigateSafe("crear?teamId=$teamId") },
-                    onDeleteClick = onDeleteRequest
+                    onDeleteClick = onDeleteRequest,
+                    onProfileClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                    }
                 )
             }
             composable(
@@ -261,8 +271,9 @@ fun MenuInferior(
             val baseItems = mutableListOf(
                 Triple("perfil", "Perfil", Icons.Default.Person),
                 Triple("buscar", "Buscar", Icons.Default.Search),
-                Triple("para_ti", "Para Ti", Icons.Default.Favorite)
-            )
+                Triple("para_ti", "Para Ti", Icons.Default.Slideshow),
+                Triple("favoritos", "Favs.", Icons.Default.Favorite)
+            )                                   //Para que no se empequeñezcan los botones (cuando está el log favoritos solo entra en dos lineas y queda mal, asi que Favs. esta para eso, no es un error
             if (isAdmin) {
                 baseItems.add(Triple("logs", "Logs", Icons.Default.History))
             }

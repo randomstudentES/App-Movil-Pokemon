@@ -27,6 +27,9 @@ class MainViewModel(
 
     private val _allTeams = MutableStateFlow<List<Equipo>>(emptyList())
     val allTeams: StateFlow<List<Equipo>> = _allTeams
+
+    private val _allUsers = MutableStateFlow<List<Usuario>>(emptyList())
+    val allUsers: StateFlow<List<Usuario>> = _allUsers
     
     private val _apiError = MutableStateFlow<String?>(null)
     val apiError: StateFlow<String?> = _apiError
@@ -62,6 +65,9 @@ class MainViewModel(
             if (user != null) {
                 Logger.log(user.uid, user.name, "Inicio de sesión")
                 loadTeams(user.uid)
+                if (user.rol == "admin") {
+                    loadAllUsers()
+                }
             } else {
                 _apiError.value = "Nombre de usuario o contraseña incorrectos."
             }
@@ -127,6 +133,14 @@ class MainViewModel(
                 allTeamsList.filter { it.creador != currentUserId }
             } else {
                 allTeamsList
+            }
+        }
+    }
+
+    fun loadAllUsers() {
+        viewModelScope.launch {
+            if (_currentUser.value?.rol == "admin") {
+                _allUsers.value = firestoreService.getAllUsers()
             }
         }
     }

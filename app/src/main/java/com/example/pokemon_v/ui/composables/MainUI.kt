@@ -23,6 +23,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -34,6 +35,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.pokemon_v.R
 import com.example.pokemon_v.models.Equipo
+import com.example.pokemon_v.services.AuthService
 import com.example.pokemon_v.services.FirestoreService
 import com.example.pokemon_v.ui.composables.pantallas.*
 import com.example.pokemon_v.viewmodels.MainViewModel
@@ -50,27 +52,24 @@ fun NavMenuScreen() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val context = androidx.compose.ui.platform.LocalContext.current // Needed for Room
+    val context = androidx.compose.ui.platform.LocalContext.current
 
-    // 1. Initialize your Room Database and get the DAO
     val database = remember { AppDatabase.getDatabase(context) }
     val favoriteDao = remember { database.favoriteDao() }
 
     val firestoreService = remember { FirestoreService() }
+    val authService = remember { AuthService(context) }
 
-    // 2. Pass BOTH dependencies to the Factory
     val viewModel: MainViewModel = viewModel(
-        factory = MainViewModelFactory(firestoreService, favoriteDao)
+        factory = MainViewModelFactory(firestoreService, favoriteDao, authService)
     )
     val currentUser by viewModel.currentUser.collectAsState()
 
-    // Determinamos si el usuario es administrador
     val isAdmin = currentUser?.rol == "admin"
-    
-    // Lista de pantallas del Pager dinámica basada en el rol
+
     val mainScreens = remember(isAdmin) {
         if (isAdmin) {
-            listOf("perfil", "buscar", "para_ti", "favoritos", "logs")
+            listOf("perfil", "buscar", "para_ti", "favoritos", "logs", "users")
         } else {
             listOf("perfil", "buscar", "para_ti", "favoritos")
         }
@@ -144,7 +143,8 @@ fun NavMenuScreen() {
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(index)
                         }
-                    }
+                    },
+                    mainScreens = mainScreens
                 )
             }
         },
@@ -173,27 +173,20 @@ fun NavMenuScreen() {
                         "buscar" -> BuscarScreen(
                             viewModel = viewModel,
                             onInfoClick = { teamId -> navController.navigateSafe("info_equipo/$teamId") },
-                            onProfileClick = {
-                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                            }
+                            onProfileClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
                         )
                         "para_ti" -> ParaTiScreen(
                             viewModel = viewModel,
                             onInfoClick = { teamId -> navController.navigateSafe("info_equipo/$teamId") },
-                            onProfileClick = {
-                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                            }
+                            onProfileClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
                         )
                         "favoritos" -> FavoritosScreen(
                             viewModel = viewModel,
                             onInfoClick = { teamId -> navController.navigateSafe("info_equipo/$teamId") },
-                            onProfileClick = {
-                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                            }
+                            onProfileClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
                         )
-                        "logs" -> LogsScreen(
-                            viewModel = viewModel
-                        )
+                        "logs" -> LogsScreen(viewModel = viewModel)
+                        "users" -> AdminUsersScreen(viewModel = viewModel)
                     }
                 }
             }
@@ -227,9 +220,7 @@ fun NavMenuScreen() {
                     onBack = { navController.popBackStack() },
                     onEditClick = { teamId -> navController.navigateSafe("crear?teamId=$teamId") },
                     onDeleteClick = onDeleteRequest,
-                    onProfileClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                    }
+                    onProfileClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
                 )
             }
             composable(
@@ -255,10 +246,12 @@ fun MenuInferior(
     navController: NavHostController,
     currentRoute: String?,
     viewModel: MainViewModel,
-    onNavigateToPage: (Int) -> Unit
+    onNavigateToPage: (Int) -> Unit,
+    mainScreens: List<String>
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
     val isAdmin = currentUser?.rol == "admin"
+    var showAdminMenu by remember { mutableStateOf(false) }
 
     NavigationBar(
         modifier = Modifier
@@ -268,54 +261,90 @@ fun MenuInferior(
         tonalElevation = 0.dp
     ) {
         val items = remember(isAdmin) {
-            val baseItems = mutableListOf(
+            mutableListOf(
                 Triple("perfil", "Perfil", Icons.Default.Person),
                 Triple("buscar", "Buscar", Icons.Default.Search),
                 Triple("para_ti", "Para Ti", Icons.Default.Slideshow),
                 Triple("favoritos", "Favs.", Icons.Default.Favorite)
-            )                                   //Para que no se empequeñezcan los botones (cuando está el log favoritos solo entra en dos lineas y queda mal, asi que Favs. esta para eso, no es un error
-            if (isAdmin) {
-                baseItems.add(Triple("logs", "Logs", Icons.Default.History))
+            ).apply {
+                if (isAdmin) {
+                    add(Triple("admin", "Admin", Icons.Default.AdminPanelSettings))
+                }
+                add(Triple("crear", "Crear", Icons.Default.Add))
             }
-            baseItems.add(Triple("crear", "Crear", Icons.Default.Add))
-            baseItems.toList()
         }
 
-        items.forEachIndexed { index, (route, label, icon) ->
-            val isSelected = currentRoute == route
-            val isCrear = route == "crear"
-
-            NavigationBarItem(
-                selected = isSelected,
-                label = { Text(label, color = if (isCrear) Color(0xFF2196F3) else if (isSelected) Color.White else Color.Gray) },
-                icon = { Icon(icon, contentDescription = label, tint = if (isCrear) Color(0xFF2196F3) else if (isSelected) Color.White else Color.Gray) },
-                onClick = {
-                    if (route == "crear") {
-                        if (currentUser != null) {
-                            navController.navigateSafe("crear")
-                        } else {
-                            onNavigateToPage(0)
-                        }
-                    } else {
-                        onNavigateToPage(index)
+        items.forEach { (route, label, icon) ->
+            if (route == "admin") {
+                Box(modifier = Modifier.weight(1f)) {
+                    val isAdminRouteSelected = currentRoute == "logs" || currentRoute == "users"
+                    this@NavigationBar.NavigationBarItem(
+                        selected = isAdminRouteSelected,
+                        label = { Text("Admin", color = if (isAdminRouteSelected) Color.White else Color.Gray) },
+                        icon = { Icon(icon, contentDescription = label, tint = if (isAdminRouteSelected) Color.White else Color.Gray) },
+                        onClick = { showAdminMenu = true }
+                    )
+                    DropdownMenu(
+                        expanded = showAdminMenu,
+                        onDismissRequest = { showAdminMenu = false },
+                        offset = DpOffset(x = 0.dp, y = (-120).dp) // Opens menu upwards
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Logs") },
+                            onClick = {
+                                val logsIndex = mainScreens.indexOf("logs")
+                                if (logsIndex != -1) onNavigateToPage(logsIndex)
+                                showAdminMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Users") },
+                            onClick = {
+                                val usersIndex = mainScreens.indexOf("users")
+                                if (usersIndex != -1) onNavigateToPage(usersIndex)
+                                showAdminMenu = false
+                            }
+                        )
                     }
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = if (isCrear) Color(0xFF2196F3).copy(alpha = 0.1f) else Color(0xFF333333)
+                }
+            } else {
+                val isSelected = currentRoute == route
+                val isCrear = route == "crear"
+                NavigationBarItem(
+                    selected = isSelected,
+                    label = { Text(label, color = if (isCrear) Color(0xFF2196F3) else if (isSelected) Color.White else Color.Gray) },
+                    icon = { Icon(icon, contentDescription = label, tint = if (isCrear) Color(0xFF2196F3) else if (isSelected) Color.White else Color.Gray) },
+                    onClick = {
+                        if (route == "crear") {
+                            if (currentUser != null) {
+                                navController.navigateSafe("crear")
+                            } else {
+                                onNavigateToPage(0) // Go to profile if not logged in
+                            }
+                        } else {
+                            val pageIndex = mainScreens.indexOf(route)
+                            if (pageIndex != -1) {
+                                onNavigateToPage(pageIndex)
+                            }
+                        }
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = if (isCrear) Color(0xFF2196F3).copy(alpha = 0.1f) else Color(0xFF333333)
+                    )
                 )
-            )
+            }
         }
     }
 }
 
 @Composable
 fun TeamList(
-    teams: List<Equipo>, 
+    teams: List<Equipo>,
     favoriteTeamIds: List<String>,
     onFavoriteToggle: (String) -> Unit,
     onInfoClick: (String) -> Unit,
     onProfileClick: () -> Unit,
-    onDeleteClick: (Equipo) -> Unit, 
+    onDeleteClick: (Equipo) -> Unit,
     onEditClick: (String) -> Unit,
     showEditButton: Boolean,
     showDeleteButton: Boolean
@@ -344,7 +373,6 @@ fun TeamList(
     }
 }
 
-
 @Composable
 fun GetUserName(userId: String, firestoreService: FirestoreService) {
     var userName by remember { mutableStateOf("...") }
@@ -365,7 +393,6 @@ fun GetUserName(userId: String, firestoreService: FirestoreService) {
 fun CardBackground(background: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
-    // Intenta interpretar el string como un color hexadecimal
     val color = try {
         Color("FF$background".toLong(16))
     } catch (e: Exception) {
@@ -373,10 +400,8 @@ fun CardBackground(background: String, modifier: Modifier = Modifier) {
     }
 
     if (color != null) {
-        // Si es un color, usa un Box con ese color de fondo
         Box(modifier = modifier.background(color))
     } else {
-        // Si no es un color, intenta cargarlo como un recurso drawable
         val drawableId = remember(background) {
             try {
                 val id = context.resources.getIdentifier(background, "drawable", context.packageName)
@@ -434,7 +459,6 @@ fun SlideShow(pokemonIds: List<String>, backgroundName: String, modifier: Modifi
     val pagerState = rememberPagerState(pageCount = { pokemonIds.size + 1 })
 
     Box(modifier = modifier) {
-        // Fondo unificado que maneja tanto colores como drawables
         CardBackground(
             background = backgroundName,
             modifier = Modifier.fillMaxSize()
@@ -445,7 +469,6 @@ fun SlideShow(pokemonIds: List<String>, backgroundName: String, modifier: Modifi
             modifier = Modifier.fillMaxSize()
         ) { page ->
             if (page == 0) {
-                // TeamComposition ya no necesita el fondo
                 TeamComposition(
                     pokemonIds = pokemonIds,
                     modifier = Modifier.fillMaxSize()
@@ -465,15 +488,15 @@ fun SlideShow(pokemonIds: List<String>, backgroundName: String, modifier: Modifi
 
 @Composable
 fun TeamCard(
-    onInfoClick: () -> Unit, 
-    onProfileClick: () -> Unit, 
-    nombreEquipo: String, 
-    nombreCreador: String, 
+    onInfoClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    nombreEquipo: String,
+    nombreCreador: String,
     pokemons: List<String> = emptyList(),
     backgroundColor: String = "default_background",
-    showButtonInfo: Boolean, 
-    onEditClick: () -> Unit = {}, 
-    showEditButton: Boolean = false, 
+    showButtonInfo: Boolean,
+    onEditClick: () -> Unit = {},
+    showEditButton: Boolean = false,
     onDeleteClick: () -> Unit = {},
     showDeleteButton: Boolean = false,
     isFavorite: Boolean = false,
@@ -502,7 +525,7 @@ fun TeamCard(
             } else {
                 SlideShow(
                     pokemonIds = pokemons,
-                    backgroundName = backgroundColor, 
+                    backgroundName = backgroundColor,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -557,23 +580,17 @@ fun TeamCard(
                         shape = RoundedCornerShape(12.dp),
                         border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(width = 2.dp)
                     ) {
-                        Text(
-                            text = "info",
-                            color = Color.Black
-                        )
+                        Text(text = "info", color = Color.Black)
                     }
                 }
-    
+
                 if (showEditButton) {
                     OutlinedButton(
                         onClick = onEditClick,
                         shape = RoundedCornerShape(12.dp),
                         border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(width = 2.dp)
                     ) {
-                        Text(
-                            text = "Editar",
-                            color = Color.Black
-                        )
+                        Text(text = "Editar", color = Color.Black)
                     }
                 }
                 if (showDeleteButton) {

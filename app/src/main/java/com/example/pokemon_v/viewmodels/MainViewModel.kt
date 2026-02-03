@@ -8,6 +8,7 @@ import com.example.pokemon_v.data.local.entities.FavoriteTeam
 import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.models.LogEntry
 import com.example.pokemon_v.models.Usuario
+import com.example.pokemon_v.services.AuthService
 import com.example.pokemon_v.services.FirestoreService
 import com.example.pokemon_v.utils.Logger
 import com.google.firebase.firestore.QuerySnapshot
@@ -16,7 +17,8 @@ import kotlinx.coroutines.launch
 
 class MainViewModel(
     private val firestoreService: FirestoreService,
-    private val favoriteDao: FavoriteDao
+    private val favoriteDao: FavoriteDao,
+    private val authService: AuthService
 ) : ViewModel() {
 
     private val _currentUser = MutableStateFlow<Usuario?>(null)
@@ -52,6 +54,13 @@ class MainViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    init {
+        val (name, password) = authService.getCredentials()
+        if (name != null && password != null) {
+            login(name, password)
+        }
+    }
+
     fun clearApiError() {
         _apiError.value = null
     }
@@ -61,12 +70,19 @@ class MainViewModel(
         viewModelScope.launch {
             _apiError.value = null
             val user = firestoreService.login(name, password)
-            _currentUser.value = user
             if (user != null) {
-                Logger.log(user.uid, user.name, "Inicio de sesión")
-                loadTeams(user.uid)
-                if (user.rol == "admin") {
-                    loadAllUsers()
+                if (user.online > 0) {
+                    val newOnlineValue = user.online - 1
+                    firestoreService.updateUserOnlineStatus(user.uid, newOnlineValue)
+                    _currentUser.value = user.copy(online = newOnlineValue)
+                    authService.saveCredentials(name, password) // Save credentials
+                    Logger.log(user.uid, user.name, "Inicio de sesión")
+                    loadTeams(user.uid)
+                    if (user.rol == "admin") {
+                        loadAllUsers()
+                    }
+                } else {
+                    _apiError.value = "No tienes sesiones disponibles. Contacta a un administrador."
                 }
             } else {
                 _apiError.value = "Nombre de usuario o contraseña incorrectos."
@@ -78,8 +94,9 @@ class MainViewModel(
         viewModelScope.launch {
             _apiError.value = null
             val newUser = firestoreService.register(user)
-            _currentUser.value = newUser
             if (newUser != null) {
+                _currentUser.value = newUser
+                authService.saveCredentials(newUser.name, newUser.password) // Save credentials
                 Logger.log(newUser.uid, newUser.name, "Registro de usuario e inicio de sesión")
             } else {
                 _apiError.value = "El nombre de usuario ya existe."
@@ -88,11 +105,16 @@ class MainViewModel(
     }
 
     fun logout() {
-        _currentUser.value?.let { 
-            Logger.log(it.uid, it.name, "Cierre de sesión")
+        viewModelScope.launch {
+            _currentUser.value?.let {
+                val newOnlineValue = it.online + 1
+                firestoreService.updateUserOnlineStatus(it.uid, newOnlineValue)
+                Logger.log(it.uid, it.name, "Cierre de sesión")
+            }
+            authService.clearCredentials() // Clear credentials
+            _currentUser.value = null
+            _teams.value = emptyList()
         }
-        _currentUser.value = null
-        _teams.value = emptyList()
     }
 
     fun updateUserDescription(description: String) {
@@ -142,6 +164,13 @@ class MainViewModel(
             if (_currentUser.value?.rol == "admin") {
                 _allUsers.value = firestoreService.getAllUsers()
             }
+        }
+    }
+
+    fun updateUserOnlineStatus(userId: String, online: Int) {
+        viewModelScope.launch {
+            firestoreService.updateUserOnlineStatus(userId, online)
+            loadAllUsers()
         }
     }
 

@@ -4,7 +4,6 @@ package com.example.pokemon_v.ui.composables.pantallas
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -92,7 +91,7 @@ fun CrearScreen(
     val pokemonData = remember { readPokemonFromCsv(context) }
     val teams by viewModel.teams.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
-    val allUsers by viewModel.allUsers.collectAsState()
+    val allUsers by viewModel.allUsers.collectAsState(initial = emptyList())
     val isAdmin = currentUser?.rol == "admin"
 
     var selectedUser by remember { mutableStateOf<Usuario?>(null) }
@@ -120,18 +119,15 @@ fun CrearScreen(
         )
     }
 
-    fun getDrawableId(name: String): Int {
-        val id = context.resources.getIdentifier(name, "drawable", context.packageName)
-        return if (id == 0) R.drawable.placeholder else id
-    }
-
     LaunchedEffect(teamId, teams) {
         if (!isInitialized && teamId != null) {
             val team = teams.find { it.id == teamId }
             if (team != null) {
                 teamName = team.nombre
                 selectedBackground = team.backgroundColor
-                val pokemons = ArrayList<String?>(team.pokemons)
+
+                val pokemons: MutableList<String?> = team.pokemons.toMutableList()
+
                 while (pokemons.size < 6) {
                     pokemons.add(null)
                 }
@@ -177,8 +173,8 @@ fun CrearScreen(
     }
 
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
-    val resultState = savedStateHandle?.getStateFlow<String?>("selected_pokemon", null)?.collectAsState()
-    val targetIndexState = savedStateHandle?.getStateFlow<Int?>("target_index", null)?.collectAsState()
+    val resultState = savedStateHandle?.getStateFlow<String?>("selected_pokemon", null)?.collectAsState(initial = null)
+    val targetIndexState = savedStateHandle?.getStateFlow<Int?>("target_index", null)?.collectAsState(initial = null)
 
     LaunchedEffect(resultState?.value, targetIndexState?.value) {
         val id = resultState?.value
@@ -190,8 +186,8 @@ fun CrearScreen(
                 newList[index] = id
                 selectedPokemons = newList
             }
-            savedStateHandle.remove<String>("selected_pokemon")
-            savedStateHandle.remove<Int>("target_index")
+            savedStateHandle?.remove<String>("selected_pokemon")
+            savedStateHandle?.remove<Int>("target_index")
         }
     }
 
@@ -236,7 +232,7 @@ fun CrearScreen(
                         expanded = userSelectorExpanded,
                         onDismissRequest = { userSelectorExpanded = false }
                     ) {
-                        allUsers.forEach { user ->
+                        allUsers.forEach { user: Usuario ->
                             DropdownMenuItem(
                                 text = { Text(user.name) },
                                 onClick = {
@@ -328,24 +324,22 @@ fun CrearScreen(
                             title = { Text("Seleccionar Fondo") },
                             text = {
                                 LazyVerticalGrid(
-                                    columns = GridCells.Adaptive(minSize = 100.dp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    columns = GridCells.Fixed(3),
+                                    modifier = Modifier.height(200.dp)
                                 ) {
-                                    items(backgrounds) { bgName ->
-                                        Image(
-                                            painter = painterResource(id = getDrawableId(bgName)),
-                                            contentDescription = bgName,
+                                    items(backgrounds) { bg: String ->
+                                        Box(
                                             modifier = Modifier
-                                                .size(100.dp)
-                                                .clip(MaterialTheme.shapes.medium)
+                                                .size(60.dp)
+                                                .padding(4.dp)
+                                                .clip(MaterialTheme.shapes.small)
                                                 .clickable {
-                                                    selectedBackground = bgName
+                                                    selectedBackground = bg
                                                     backgroundSelectorExpanded = false
-                                                },
-                                            contentScale = ContentScale.Crop
-                                        )
+                                                }
+                                        ) {
+                                            BackgroundPreview(background = bg, modifier = Modifier.fillMaxSize())
+                                        }
                                     }
                                 }
                             },

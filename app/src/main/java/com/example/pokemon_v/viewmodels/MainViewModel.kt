@@ -30,6 +30,9 @@ class MainViewModel(
 
     private val _allUsers = MutableStateFlow<List<Usuario>>(emptyList())
     val allUsers: StateFlow<List<Usuario>> = _allUsers
+
+    private val _searchResults = MutableStateFlow<List<Equipo>>(emptyList())
+    val searchResults: StateFlow<List<Equipo>> = _searchResults
     
     private val _apiError = MutableStateFlow<String?>(null)
     val apiError: StateFlow<String?> = _apiError
@@ -93,6 +96,7 @@ class MainViewModel(
         }
         _currentUser.value = null
         _teams.value = emptyList()
+        _allUsers.value = emptyList()
     }
 
     fun updateUserDescription(description: String) {
@@ -103,6 +107,13 @@ class MainViewModel(
                 // Actualizamos el estado local también
                 _currentUser.value = it.copy(description = description)
             }
+        }
+    }
+
+    // User operations
+    fun loadAllUsers() {
+        viewModelScope.launch {
+            _allUsers.value = firestoreService.getAllUsers()
         }
     }
 
@@ -137,10 +148,14 @@ class MainViewModel(
         }
     }
 
-    fun loadAllUsers() {
+    fun searchTeams(query: String) {
         viewModelScope.launch {
-            if (_currentUser.value?.rol == "admin") {
-                _allUsers.value = firestoreService.getAllUsers()
+            val currentUserId = _currentUser.value?.uid
+            val results = firestoreService.searchTeams(query)
+            _searchResults.value = if (currentUserId != null) {
+                results.filter { it.creador != currentUserId }
+            } else {
+                results
             }
         }
     }

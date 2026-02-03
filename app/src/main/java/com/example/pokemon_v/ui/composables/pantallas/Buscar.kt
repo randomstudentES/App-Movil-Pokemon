@@ -22,12 +22,13 @@ fun BuscarScreen(
     onProfileClick: () -> Unit
 ) {
     var searchText by remember { mutableStateOf("") }
-    val allTeams by viewModel.allTeams.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
     val favoriteTeamIds by viewModel.favoriteTeamIds.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.loadAllTeams()
+    // Realizar la búsqueda cuando el texto cambie
+    LaunchedEffect(searchText) {
+        viewModel.searchTeams(searchText)
     }
 
     Column(
@@ -52,7 +53,7 @@ fun BuscarScreen(
         )
 
         TeamList(
-            teams = allTeams.filter { it.nombre.contains(searchText, ignoreCase = true) },
+            teams = searchResults,
             favoriteTeamIds = favoriteTeamIds,
             onFavoriteToggle = { teamId -> 
                 if (currentUser == null) {

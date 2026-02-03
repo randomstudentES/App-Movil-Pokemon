@@ -157,6 +157,27 @@ class FirestoreService {
         }
     }
 
+    suspend fun searchTeams(queryText: String): List<Equipo> {
+        return try {
+            if (queryText.isEmpty()) return getAllTeams()
+            
+            // Firestore doesn't support full-text search directly without 3rd party
+            // This is a common workaround for prefix matching:
+            val snapshot = equiposCollection
+                .orderBy("nombre")
+                .startAt(queryText)
+                .endAt(queryText + "\uf8ff")
+                .limit(20)
+                .get()
+                .await()
+            
+            snapshot.toObjects(Equipo::class.java)
+        } catch (e: Exception) {
+            Log.e("FirestoreService", "Error searching teams", e)
+            emptyList()
+        }
+    }
+
     suspend fun updateTeam(userId: String, team: Equipo) {
         if (team.id.isNotEmpty() && team.creador == userId) {
             try {

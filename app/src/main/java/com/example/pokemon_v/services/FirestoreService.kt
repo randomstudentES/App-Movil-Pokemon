@@ -123,6 +123,16 @@ class FirestoreService {
         }
     }
 
+    suspend fun updateUserOnlineStatus(userId: String, online: Int) {
+        if (userId.isNotEmpty()) {
+            try {
+                usuariosCollection.document(userId).update("online", online).await()
+            } catch (e: Exception) {
+                Log.e("FirestoreService", "Error updating online status", e)
+            }
+        }
+    }
+
     // Team operations
     suspend fun createTeam(userId: String, team: Equipo) {
         try {

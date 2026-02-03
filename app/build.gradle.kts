@@ -56,6 +56,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("androidx.compose.foundation:foundation:1.7.0-beta01")
+    implementation("androidx.preference:preference-ktx:1.2.1")
+    implementation("androidx.security:security-crypto:1.0.0")
     
     // MySQL Connector
     implementation("mysql:mysql-connector-java:5.1.49")

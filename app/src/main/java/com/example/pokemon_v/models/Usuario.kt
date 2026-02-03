@@ -10,5 +10,6 @@ data class Usuario(
     val salt: String = "",
     val rol: String = "usuario",
     val created_at: Timestamp = Timestamp.now(),
-    val teamIds: List<String> = emptyList()
+    val teamIds: List<String> = emptyList(),
+    val online: Int = 1
 )

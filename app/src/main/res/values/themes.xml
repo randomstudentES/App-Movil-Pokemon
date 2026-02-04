@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Pokemonv" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Pokemonv" parent="android:Theme.Material.NoActionBar" />
+
+    <!-- Theme required for CanHub/Android-Image-Cropper Activity to show the Crop button -->
+    <style name="Theme.AppCropper" parent="Theme.AppCompat" />
 </resources>

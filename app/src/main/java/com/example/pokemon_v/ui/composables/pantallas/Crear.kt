@@ -1,4 +1,3 @@
-
 package com.example.pokemon_v.ui.composables.pantallas
 
 import androidx.activity.compose.BackHandler
@@ -81,7 +80,7 @@ fun CrearScreen(
     var selectedPokemons by rememberSaveable {
         mutableStateOf(listOf<String?>(null, null, null, null, null, null))
     }
-    var selectedBackground by rememberSaveable { mutableStateOf("default_background") }
+    var selectedBackground by rememberSaveable { mutableStateOf("dp_pikachu") }
     var isInitialized by rememberSaveable { mutableStateOf(false) }
     
     var showExitConfirmation by remember { mutableStateOf(false) }
@@ -91,37 +90,48 @@ fun CrearScreen(
     val pokemonData = remember { readPokemonFromCsv(context) }
     val teams by viewModel.teams.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
-    val allUsers by viewModel.allUsers.collectAsState(initial = emptyList())
+    val allUsers by viewModel.allUsers.collectAsState()
     val isAdmin = currentUser?.rol == "admin"
 
-    var selectedUser by remember { mutableStateOf<Usuario?>(null) }
+    var selectedUserId by rememberSaveable { mutableStateOf<String?>(null) }
+    var originalCreatorId by rememberSaveable { mutableStateOf<String?>(null) }
     var userSelectorExpanded by remember { mutableStateOf(false) }
 
+    val selectedUser = remember(selectedUserId, allUsers) {
+        allUsers.find { it.uid == selectedUserId }
+    }
+
     LaunchedEffect(allUsers, currentUser) {
-        if (isAdmin && selectedUser == null) {
-            selectedUser = currentUser
+        if (isAdmin && selectedUserId == null) {
+            selectedUserId = currentUser?.uid
         }
     }
 
     val backgrounds = remember {
         listOf(
-            "bn_n", "dp_trio", "xy_mega", "xy_trio", "bn_munna", "dp_patio", "plt_trio", "rfvh_mar", "rfvh_rio",
-            "rze_azul", "bn_sabios", "bn_zekrom", "hgss_alma", "hgss_trio", "roza_aqua", "roza_mapa", "roza_trio",
-            "dp_espacio", "dp_pikachu", "dp_torchic", "hgss_pichu", "plt_raichu", "rfvh_cielo", "rfvh_cueva",
-            "rfvh_nieve", "rfvh_playa", "roza_magma", "xy_xerneas", "xy_yveltal", "bn_reshiram", "hgss_castor",
-            "hgss_kimono", "hgss_rocket", "plt_leyenda", "rfvh_bosque", "rfvh_ciudad", "rfvh_sabana", "rfvh_volcan",
-            "xy_conexion", "dp_nostalgia", "hgss_corazon", "plt_concurso", "plt_croagunk", "rfvh_montana",
-            "xy_pastelito", "plt_nostalgia", "rfvh_desierto", "roza_concurso", "xy_team_flare", "dp_legendarios",
-            "plt_distorsion", "bn_musical_pkmn", "hgss_pokeathlon", "bn_equipo_plasma", "bn_metro_batalla",
-            "bn_blanco_y_negro", "dp_equipo_galaxia", "rze_copo_de_nieve", "plt_equipo_galaxia",
-            "roza_mega_rayquaza", "bn_zorua_y_zororark", "xy_superentrenamiento", "roza_kyogre_primigenio",
-            "roza_groudon_primigenio", "hgss_parque_nacional_dia", "hgss_parque_nacional_noche"
+            "bn_blanco_negro", "bn_equipo_plasma", "bn_metro_batalla", "bn_munna", "bn_musical_pkmn",
+            "bn_n", "bn_reshiram", "bn_sabios", "bn_zekrom", "bn_zorua_zoroark",
+            "dp_equipo_galaxia", "dp_espacio", "dp_legendarios", "dp_nostalgia", "dp_patio",
+            "dp_pikachu", "dp_torchic", "dp_trio",
+            "hgss_alma", "hgss_castor", "hgss_corazon", "hgss_kimono",
+            "hgss_parque_nacional_dia", "hgss_parque_nacional_noche", "hgss_pichu",
+            "hgss_pokeathlon", "hgss_rocket", "hgss_trio",
+            "plt_concurso", "plt_croagunk", "plt_distorsion", "plt_equipo_galaxia", 
+            "plt_leyenda", "plt_nostalgia", "plt_raichu", "plt_trio",
+            "rfvh_bosque", "rfvh_cielo", "rfvh_ciudad", "rfvh_cueva", "rfvh_desierto",
+            "rfvh_mar", "rfvh_montana", "rfvh_nieve", "rfvh_playa", "rfvh_rio",
+            "rfvh_sabana", "rfvh_volcan",
+            "roza_aqua", "roza_concurso", "roza_groudon_pri", "roza_kyogre_pri", 
+            "roza_magma", "roza_mapa", "roza_mega_rayquaza", "roza_trio",
+            "rza_azul", "rze_copo_nieve",
+            "xy_conexion", "xy_mega", "xy_pastel", "xy_superentrenamiento", 
+            "xy_team_flare", "xy_trio", "xy_xerneas", "xy_yveltal"
         )
     }
 
     LaunchedEffect(teamId, teams) {
         if (!isInitialized && teamId != null) {
-            val team = teams.find { it.id == teamId }
+            val team = viewModel.getTeamById(teamId)
             if (team != null) {
                 teamName = team.nombre
                 selectedBackground = team.backgroundColor
@@ -132,6 +142,13 @@ fun CrearScreen(
                     pokemons.add(null)
                 }
                 selectedPokemons = pokemons.toList()
+                
+                // Initialize selectedUserId if Admin is editing another user's team
+                if (isAdmin) {
+                    selectedUserId = team.creador
+                    originalCreatorId = team.creador
+                }
+                
                 isInitialized = true
             }
         }
@@ -236,7 +253,7 @@ fun CrearScreen(
                             DropdownMenuItem(
                                 text = { Text(user.name) },
                                 onClick = {
-                                    selectedUser = user
+                                    selectedUserId = user.uid
                                     userSelectorExpanded = false
                                 }
                             )
@@ -357,19 +374,20 @@ fun CrearScreen(
 
             Button(
                 onClick = {
-                    val creatorId = if (isAdmin) selectedUser?.uid ?: userId else userId
+                    val finalCreatorId = if (isAdmin) selectedUserId ?: userId else userId
                     val team = Equipo(
                         id = teamId ?: "",
                         nombre = teamName,
-                        creador = creatorId, 
+                        creador = finalCreatorId, 
                         pokemons = selectedPokemons.filterNotNull(),
                         backgroundColor = selectedBackground
                     )
                     if (teamId == null) {
-                        viewModel.createTeam(creatorId, team)
+                        viewModel.createTeam(finalCreatorId, team)
                     } else {
-                        viewModel.updateTeam(creatorId, team)
+                        viewModel.updateTeam(finalCreatorId, team, originalCreatorId)
                     }
+                    
                     navController.navigateSafe("main") { 
                         popUpTo("main") { inclusive = true }
                     }

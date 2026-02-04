@@ -11,5 +11,8 @@ data class Usuario(
     val rol: String = "usuario",
     val created_at: Timestamp = Timestamp.now(),
     val teamIds: List<String> = emptyList(),
-    val online: Int = 1
+    val online: Int = 1,
+    val sessionId: String? = null,
+    val sessions: List<Map<String, Any>> = emptyList(),
+    val profileImageUrl: String? = null
 )

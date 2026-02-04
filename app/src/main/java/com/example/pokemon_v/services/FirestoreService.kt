@@ -1,4 +1,3 @@
-
 package com.example.pokemon_v.services
 
 import android.util.Log
@@ -32,11 +31,12 @@ class FirestoreService {
                 .get()
                 .await()
             
-            val user = snapshot.toObjects(Usuario::class.java).firstOrNull()
-            if (user != null) {
+            val doc = snapshot.documents.firstOrNull()
+            val user = doc?.toObject(Usuario::class.java)
+            if (user != null && doc != null) {
                 val hashedAttempt = SecurityUtils.hashPassword(password, user.salt)
                 if (hashedAttempt == user.password) {
-                    user
+                    user.copy(uid = doc.id) // Aseguramos que el uid sea el ID del documento
                 } else {
                     null
                 }
@@ -87,7 +87,10 @@ class FirestoreService {
 
     suspend fun getUser(uid: String): Usuario? {
         return try {
-            usuariosCollection.document(uid).get().await().toObject(Usuario::class.java)
+            val doc = usuariosCollection.document(uid).get().await()
+            if (doc.exists()) {
+                doc.toObject(Usuario::class.java)?.copy(uid = doc.id)
+            } else null
         } catch (e: Exception) {
             Log.e("FirestoreService", "Error getting user", e)
             null
@@ -96,7 +99,9 @@ class FirestoreService {
 
     suspend fun getAllUsers(): List<Usuario> {
         return try {
-            usuariosCollection.get().await().toObjects(Usuario::class.java)
+            usuariosCollection.get().await().documents.mapNotNull { doc ->
+                doc.toObject(Usuario::class.java)?.copy(uid = doc.id)
+            }
         } catch (e: Exception) {
             Log.e("FirestoreService", "Error getting all users", e)
             emptyList()
@@ -113,22 +118,68 @@ class FirestoreService {
         }
     }
 
-    suspend fun updateUserDescription(uid: String, description: String) {
-        if (uid.isNotEmpty()) {
-            try {
-                usuariosCollection.document(uid).update("description", description).await()
-            } catch (e: Exception) {
-                Log.e("FirestoreService", "Error updating description", e)
-            }
+    suspend fun updateUserDescription(uid: String, description: String): Boolean {
+        if (uid.isEmpty()) return false
+        return try {
+            usuariosCollection.document(uid).update("description", description).await()
+            true
+        } catch (e: Exception) {
+            Log.e("FirestoreService", "Error updating description", e)
+            false
         }
     }
 
-    suspend fun updateUserOnlineStatus(userId: String, online: Int) {
-        if (userId.isNotEmpty()) {
-            try {
-                usuariosCollection.document(userId).update("online", online).await()
-            } catch (e: Exception) {
-                Log.e("FirestoreService", "Error updating online status", e)
+    suspend fun updateUserOnlineStatus(userId: String, newOnline: Int) {
+        try {
+            usuariosCollection.document(userId).update("online", newOnline).await()
+        } catch (e: Exception) {
+            Log.e("FirestoreService", "Error updating online status", e)
+        }
+    }
+
+    suspend fun updateUserProfilePicture(userId: String, url: String?): Boolean {
+        if (userId.trim().isEmpty()) {
+            Log.e("FirestoreService", "Error: Intento de actualizar foto con userId vacío o compuesto solo de espacios")
+            return false
+        }
+        return try {
+            Log.d("FirestoreService", "Actualizando foto para el documento: [$userId]")
+            // Usamos set con merge en lugar de update para mayor seguridad
+            usuariosCollection.document(userId)
+                .set(mapOf("profileImageUrl" to url), com.google.firebase.firestore.SetOptions.merge())
+                .await()
+            Log.d("FirestoreService", "Actualización en Firestore completada.")
+            true
+        } catch (e: Exception) {
+            Log.e("FirestoreService", "Error updating profile picture URL for doc [$userId]", e)
+            false
+        }
+    }
+
+    suspend fun updateUserSessionList(userId: String, newOnlineValue: Int, sessions: List<Map<String, Any>>) {
+        try {
+            usuariosCollection.document(userId).update(
+                mapOf(
+                    "online" to newOnlineValue,
+                    "sessions" to sessions
+                )
+            ).await()
+        } catch (e: Exception) {
+            Log.e("FirestoreService", "Error updating session list", e)
+        }
+    }
+
+    fun listenToUser(userId: String, onUpdate: (Usuario?) -> Unit): com.google.firebase.firestore.ListenerRegistration {
+        return usuariosCollection.document(userId).addSnapshotListener { snapshot, e ->
+            if (e != null) {
+                Log.e("FirestoreService", "Listen failed.", e)
+                return@addSnapshotListener
+            }
+
+            if (snapshot != null && snapshot.exists()) {
+                onUpdate(snapshot.toObject(Usuario::class.java)?.copy(uid = snapshot.id))
+            } else {
+                onUpdate(null)
             }
         }
     }
@@ -188,10 +239,19 @@ class FirestoreService {
         }
     }
 
-    suspend fun updateTeam(userId: String, team: Equipo) {
-        if (team.id.isNotEmpty() && team.creador == userId) {
+    suspend fun updateTeam(userId: String, team: Equipo, isAdmin: Boolean = false, oldCreatorId: String? = null) {
+        if (team.id.isNotEmpty() && (team.creador == userId || isAdmin)) {
             try {
+                // Update the team document itself
                 equiposCollection.document(team.id).set(team).await()
+                
+                // If the creator changed, we need to move the reference in user documents
+                if (oldCreatorId != null && oldCreatorId != team.creador) {
+                    // Remove from old
+                    usuariosCollection.document(oldCreatorId).update("teamIds", FieldValue.arrayRemove(team.id)).await()
+                    // Add to new
+                    usuariosCollection.document(team.creador).update("teamIds", FieldValue.arrayUnion(team.id)).await()
+                }
             } catch (e: Exception) {
                 Log.e("FirestoreService", "Error updating team", e)
             }
@@ -223,6 +283,17 @@ class FirestoreService {
         } catch (e: Exception) {
             Log.e("FirestoreService", "Error getting logs", e)
             null
+        }
+    }
+
+    suspend fun deleteAllLogs() {
+        try {
+            val logs = logsCollection.get().await()
+            for (doc in logs.documents) {
+                doc.reference.delete().await()
+            }
+        } catch (e: Exception) {
+            Log.e("FirestoreService", "Error deleting logs", e)
         }
     }
 }

@@ -1,4 +1,3 @@
-
 package com.example.pokemon_v.ui.composables.pantallas
 
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +48,8 @@ fun ParaTiScreen(
                 onDeleteClick = {},
                 onEditClick = {},
                 showEditButton = false,
-                showDeleteButton = false
+                showDeleteButton = false,
+                viewModel = viewModel
             )
         }
     } else {

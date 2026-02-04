@@ -1,4 +1,3 @@
-
 package com.example.pokemon_v.ui.composables.pantallas
 
 import androidx.compose.foundation.layout.Column
@@ -67,7 +66,8 @@ fun BuscarScreen(
             onDeleteClick = {},
             onEditClick = {},
             showEditButton = false,
-            showDeleteButton = false
+            showDeleteButton = false,
+            viewModel = viewModel
         )
     }
 }

@@ -1,8 +1,11 @@
-
 package com.example.pokemon_v.ui.composables.pantallas
 
+import android.util.Base64
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -14,17 +17,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.pokemon_v.models.Equipo
 import com.example.pokemon_v.models.Usuario
 import com.example.pokemon_v.ui.composables.TeamList
 import com.example.pokemon_v.viewmodels.MainViewModel
+import coil.compose.AsyncImage
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
+import com.example.pokemon_v.ui.composables.UserProfileIcon
 
 @Composable
 fun PerfilScreen(
@@ -67,6 +79,27 @@ fun ProfileView(
     var isEditingDescription by remember { mutableStateOf(false) }
     var descriptionText by remember { mutableStateOf(currentUser?.description ?: "") }
     var showNotImplementedDialog by remember { mutableStateOf(false) }
+    
+    val isUploading by viewModel.isUploadingProfilePic.collectAsState()
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imageCropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result: CropImageView.CropResult ->
+        android.util.Log.d("PerfilView", "Cropper finalizado. isSuccessful: ${result.isSuccessful}")
+        if (result.isSuccessful) {
+            val uri = result.uriContent
+            android.util.Log.d("PerfilView", "URI obtenida: $uri")
+            if (uri != null) {
+                viewModel.uploadProfilePicture(uri, context)
+            } else {
+                android.util.Log.e("PerfilView", "Error: uriContent es null")
+                Toast.makeText(context, "Error: No se pudo obtener la imagen recortada", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            val error = result.error
+            android.util.Log.e("PerfilView", "Error en el cropper: ${error?.message}", error)
+            Toast.makeText(context, "Cancelado o error: ${error?.message ?: ""}", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     if (showNotImplementedDialog) {
         AlertDialog(
@@ -89,16 +122,46 @@ fun ProfileView(
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = { Text(currentUser?.name ?: "", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            CenterAlignedTopAppBar(
+                title = { Text(currentUser?.name ?: "", fontSize = 28.sp, fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(
-                            imageVector = Icons.Default.AccountCircle,
-                            contentDescription = "Opciones de perfil",
-                            modifier = Modifier.size(32.dp)
-                        )
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            if (currentUser?.profileImageUrl != null) {
+                                val model = remember(currentUser?.profileImageUrl) {
+                                    val url = currentUser?.profileImageUrl ?: ""
+                                    if (url.startsWith("data:image")) {
+                                        try {
+                                            Base64.decode(url.substringAfter("base64,"), Base64.DEFAULT)
+                                        } catch (e: Exception) {
+                                            url
+                                        }
+                                    } else {
+                                        url
+                                    }
+                                }
+                                AsyncImage(
+                                    model = model,
+                                    contentDescription = "Foto de perfil",
+                                    modifier = Modifier.size(32.dp).clip(CircleShape)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
+                                    contentDescription = "Opciones de perfil",
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+                        
+                        if (isUploading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(32.dp).align(Alignment.Center),
+                                strokeWidth = 2.dp
+                            )
+                        }
                     }
+
                     DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
@@ -106,14 +169,29 @@ fun ProfileView(
                         DropdownMenuItem(
                             text = { Text("Modificar foto de perfil") }, 
                             onClick = { 
-                                showNotImplementedDialog = true
+                                val options = CropImageContractOptions(
+                                    null,
+                                    CropImageOptions(
+                                        imageSourceIncludeGallery = true,
+                                        imageSourceIncludeCamera = true,
+                                        guidelines = CropImageView.Guidelines.ON,
+                                        aspectRatioX = 1,
+                                        aspectRatioY = 1,
+                                        fixAspectRatio = true,
+                                        activityTitle = "Recortar Foto",
+                                        toolbarColor = android.graphics.Color.BLACK,
+                                        toolbarBackButtonColor = android.graphics.Color.WHITE,
+                                        activityMenuIconColor = android.graphics.Color.WHITE
+                                    )
+                                )
+                                imageCropLauncher.launch(options)
                                 showMenu = false 
                             }
                         )
                         DropdownMenuItem(
                             text = { Text("Eliminar foto de perfil") }, 
                             onClick = { 
-                                showNotImplementedDialog = true
+                                viewModel.deleteProfilePicture()
                                 showMenu = false
                             }
                         )
@@ -134,6 +212,58 @@ fun ProfileView(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Foto de perfil central (Grande)
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .padding(bottom = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isUploading) {
+                    CircularProgressIndicator(modifier = Modifier.size(40.dp))
+                } else {
+                    // Imagen de perfil directa para el usuario actual (más reactivo)
+                    if (currentUser?.profileImageUrl != null) {
+                        val model = remember(currentUser?.profileImageUrl) {
+                            val url = currentUser?.profileImageUrl ?: ""
+                            if (url.startsWith("data:image")) {
+                                try {
+                                    Base64.decode(url.substringAfter("base64,"), Base64.DEFAULT)
+                                } catch (e: Exception) {
+                                    url
+                                }
+                            } else {
+                                url
+                            }
+                        }
+                        
+                        AsyncImage(
+                            model = model,
+                            contentDescription = "Foto de perfil",
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(CircleShape)
+                                .clickable { showMenu = true },
+                            contentScale = ContentScale.Crop,
+                            onLoading = { android.util.Log.d("PerfilView", "Cargando imagen de perfil... URL Len: ${currentUser?.profileImageUrl?.length}") },
+                            onSuccess = { android.util.Log.d("PerfilView", "Imagen de perfil cargada con éxito") },
+                            onError = { e -> 
+                                android.util.Log.e("PerfilView", "Error cargando imagen de perfil", e.result.throwable)
+                            }
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "Foto de perfil",
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clickable { showMenu = true },
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             if (isEditingDescription) {
                 OutlinedTextField(
                     value = descriptionText,
@@ -160,7 +290,7 @@ fun ProfileView(
             } else {
                 Text(
                     text = currentUser?.description ?: "",
-                    fontSize = 18.sp,
+                    fontSize = 14.sp,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
@@ -201,8 +331,9 @@ fun ProfileView(
                 onProfileClick = {},
                 onDeleteClick = onDeleteClick,
                 onEditClick = onEditClick,
-                showEditButton = true,
-                showDeleteButton = true
+                showEditButton = false,
+                showDeleteButton = false,
+                viewModel = viewModel
             )
         }
     }
@@ -245,6 +376,26 @@ fun LoginRegisterScreen(viewModel: MainViewModel) {
     fun validateConfirmPassword(pass1: String, pass2: String): String? {
         if (pass1 != pass2) return "Las contraseñas no coinciden."
         return null
+    }
+
+    val showLoginConfirmation by viewModel.showLoginConfirmation.collectAsState()
+
+    if (showLoginConfirmation) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelLogin() },
+            title = { Text("Usuario conectado") },
+            text = { Text("Hay otro usuario conectado con esta cuenta, si inicias sesión cerrarás la suya.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmLogin() }) {
+                    Text("Sí, cerrar antigua")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelLogin() }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     Column(

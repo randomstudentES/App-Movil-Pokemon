@@ -31,7 +31,7 @@ fun AdminUsersScreen(viewModel: MainViewModel) {
         }
         items(users) { user ->
             UserManagementCard(user = user, viewModel = viewModel)
-            Divider()
+            HorizontalDivider()
         }
     }
 }

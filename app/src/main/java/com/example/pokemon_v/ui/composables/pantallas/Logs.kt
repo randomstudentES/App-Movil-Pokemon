@@ -1,4 +1,3 @@
-
 package com.example.pokemon_v.ui.composables.pantallas
 
 import androidx.compose.foundation.layout.*
@@ -7,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,12 +48,44 @@ fun LogsScreen(viewModel: MainViewModel) {
         }
     }
 
+    val currentUser by viewModel.currentUser.collectAsState()
+    val isAdmin = currentUser?.rol == "admin"
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("¿Eliminar todos los logs?") },
+            text = { Text("Esta acción borrará permanentemente todo el historial. No se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteAllLogs()
+                    showDeleteConfirmation = false
+                }) {
+                    Text("Eliminar Todo", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text("Historial de Actividad (Logs)", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                actions = {
+                    if (isAdmin) {
+                        IconButton(onClick = { showDeleteConfirmation = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Eliminar todo", tint = Color.Red)
+                        }
+                    }
+                }
             )
         }
     ) { paddingValues ->
